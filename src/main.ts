@@ -10,6 +10,7 @@ import { createOidcAdapterFactory } from './adapter.js';
 import { loadConfig } from './config.js';
 import { createProvider } from './provider.js';
 import { createInteractionRouter } from './interactions.js';
+import { createDeveloperRouter } from './developer.js';
 import { ApplicationService } from './platform.js';
 import { createPlatformPool, PostgresApplicationRepository } from './store.js';
 
@@ -88,7 +89,14 @@ export async function start(): Promise<void> {
       config.secrets.cookie,
       config.issuer.startsWith('https:'),
     );
-    const server = createServer(createApplication(config, provider, interactions));
+    const developer = createDeveloperRouter(
+      provider,
+      accounts,
+      applications,
+      config.issuer,
+      config.issuer.startsWith('https:'),
+    );
+    const server = createServer(createApplication(config, provider, interactions, developer));
 
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
