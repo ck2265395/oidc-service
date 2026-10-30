@@ -12,7 +12,7 @@ This page records public-safe implementation status. Detailed product requiremen
 - Web client secrets encrypted with AES-GCM, returned once during creation, and rotated with revision checks. Provider client cache is cleared locally after review and rotation.
 - Upstream oidc-provider startup with persistent RS256 signing keys, S256 PKCE, authorization-code grants, and openid/profile/email scopes.
 - CSRF-protected login and consent interactions; consent shows the approved application purpose, developer, policy links, and human-readable requested data, plus a user authorization page with grant revocation.
-- Revisioned developer profile registration, owner-scoped application and group APIs, and an initial browser UI at `/developer` for profile maintenance, application drafts/review submission, secret rotation, and group requests/renames.
+- A bilingual service landing page at `/` and a developer UI at `/developer`, backed by revisioned profile, application, and group APIs for profile maintenance, drafts, review submission, secret rotation, and group requests/renames.
 - Administrator group approval, rejection, disablement, group history, and audit updates in one database transaction.
 - An independent administrator session with scrypt login, direct-peer-IP throttling, idle and absolute expiry, review queue, approve/reject/disable forms, audit view, and database status statistics.
 
