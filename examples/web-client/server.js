@@ -147,6 +147,5 @@ createServer((request, response) => {
     response.end(page('Temporarily unavailable', '<p>Check the server configuration and retry.</p>'));
   });
 }).listen(port, '0.0.0.0', () => {
-  process.stdout.write('DT Identity Web Client listening on port ' + port + '
-');
+  process.stdout.write('DT Identity Web Client listening on port ' + port + '\n');
 });
