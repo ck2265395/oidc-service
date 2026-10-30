@@ -130,11 +130,24 @@ export function createInteractionRouter(
       if (details.prompt.name === 'consent') {
         const scopes = requestedScopes(details.params.scope, active.config.scopes);
         if (!scopes) return errorPage(response);
-        const list = scopes.map((scope) => '<li>' + escapeHtml(scope) + '</li>').join('');
-        const form = '<p><strong>' + escapeHtml(active.config.name) + '</strong> 请求以下权限：</p><ul>' + list + '</ul>' +
+        const developer = await applications.getDeveloperProfile(active.record.ownerUuid);
+        if (!developer) return errorPage(response);
+        const scopeNames: Record<string, string> = {
+          openid: '识别你的身份',
+          profile: '昵称和头像',
+          email: '邮箱地址',
+        };
+        const list = scopes.map((scope) => '<li>' + escapeHtml(scopeNames[scope] ?? scope) + '</li>').join('');
+        const form = '<p><strong>' + escapeHtml(active.config.name) + '</strong> 请求以下权限：</p>' +
+          '<dl><dt>开发者</dt><dd>' + escapeHtml(developer.displayName) + '</dd>' +
+          '<dt>用途</dt><dd>' + escapeHtml(active.config.purpose) + '</dd></dl>' +
+          '<p><a href="' + escapeHtml(active.config.homepageUrl) + '" target="_blank" rel="noopener noreferrer">应用主页</a> · ' +
+          '<a href="' + escapeHtml(active.config.privacyUrl) + '" target="_blank" rel="noopener noreferrer">隐私政策</a> · ' +
+          '<a href="' + escapeHtml(active.config.termsUrl) + '" target="_blank" rel="noopener noreferrer">服务条款</a></p>' +
+          '<ul>' + list + '</ul>' +
           '<form method="post" action="/interaction/' + encodeURIComponent(details.uid) + '/consent">' +
           '<input type="hidden" name="csrf" value="' + escapeHtml(csrf) + '">' +
-          '<button type="submit" name="decision" value="allow">同意</button>' +
+          '<button type="submit" name="decision" value="allow">全部同意</button>' +
           '<button type="submit" name="decision" value="deny">拒绝</button></form>';
         return response.type('html').send(page('授权确认', form));
       }
