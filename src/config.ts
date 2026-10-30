@@ -24,6 +24,7 @@ export interface ServiceConfig {
   redisUrl: string;
   trustedProxyCidrs: string[];
   loginRateLimit: { windowSeconds: number; accountAttempts: number; ipAttempts: number };
+  smtp: { host: string; port: number; secure: boolean; user: string | null; password: string | null; from: string } | null;
 }
 
 export class ConfigError extends Error {
@@ -133,6 +134,25 @@ function trustedProxyCidrsAt(value: unknown): string[] {
   });
 }
 
+function smtpConfigAt(value: unknown): ServiceConfig['smtp'] {
+  if (value === undefined || value === null) return null;
+  const input = objectAt(value, 'smtp');
+  const host = stringAt(input.host, 'smtp.host');
+  if (host.length > 253 || !/^[A-Za-z0-9.-]+$/.test(host) || host.startsWith('.') || host.endsWith('.')) {
+    throw new ConfigError('smtp.host must be a hostname or IP address');
+  }
+  if (!Number.isInteger(input.port) || Number(input.port) < 1 || Number(input.port) > 65535) {
+    throw new ConfigError('smtp.port must be an integer between 1 and 65535');
+  }
+  if (typeof input.secure !== 'boolean') throw new ConfigError('smtp.secure must be a boolean');
+  const user = input.user === undefined || input.user === null || input.user === '' ? null : stringAt(input.user, 'smtp.user');
+  const password = input.password === undefined || input.password === null || input.password === '' ? null : stringAt(input.password, 'smtp.password');
+  if ((user === null) !== (password === null)) throw new ConfigError('smtp.user and smtp.password must be configured together');
+  const from = stringAt(input.from, 'smtp.from');
+  if (from.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(from)) throw new ConfigError('smtp.from must be an email address');
+  return { host, port: Number(input.port), secure: input.secure, user, password, from };
+}
+
 function rateLimitConfigAt(value: unknown): ServiceConfig['loginRateLimit'] {
   const input = value === undefined ? {} : objectAt(value, 'loginRateLimit');
   const integer = (key: string, fallback: number, minimum: number, maximum: number): number => {
@@ -205,5 +225,6 @@ export function loadConfig(input: unknown): ServiceConfig {
     redisUrl: urlAt(root.redisUrl, 'redisUrl', ['redis:', 'rediss:']),
     trustedProxyCidrs: trustedProxyCidrsAt(root.trustedProxyCidrs),
     loginRateLimit: rateLimitConfigAt(root.loginRateLimit),
+    smtp: smtpConfigAt(root.smtp),
   };
 }
