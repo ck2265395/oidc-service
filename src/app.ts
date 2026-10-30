@@ -6,7 +6,7 @@ import type Provider from 'oidc-provider';
 
 import type { ServiceConfig } from './config.js';
 
-export function createApplication(
+export interface ProtocolAuditEvent {\n  requestId: string;\n  endpoint: string;\n  outcome: 'success' | 'denied' | 'failure';\n  status: number;\n  durationMs: number;\n  clientId: string | null;\n}\n\nexport function createApplication(
   config: ServiceConfig,
   provider?: Provider,
   interactions?: Router,
@@ -14,6 +14,7 @@ export function createApplication(
   admin?: Router,
   userPortal?: Router,
   readiness?: () => Promise<void>,
+  recordProtocolEvent?: (event: ProtocolAuditEvent) => Promise<void>,
 ): Express {
   const app = express();
   const publicDirectory = resolve(process.cwd(), 'public');
@@ -69,7 +70,46 @@ export function createApplication(
   if (developer) app.use('/api/v1/developer', developer);
   if (admin) app.use('/admin', admin);
   if (userPortal) app.use('/portal', userPortal);
-  if (provider) app.use(provider.callback());
+  if (provider) {
+    if (recordProtocolEvent) {
+      app.use((request, response, next) => {
+        const pathname = request.path;
+        const endpoints = ['/authorize', '/token', '/userinfo', '/revoke', '/session/end'];
+        const endpoint = endpoints.find((candidate) => pathname === candidate || pathname.startsWith(candidate + '/'));
+        if (!endpoint) return next();
+        const startedAt = Date.now();
+        const requestId = String(response.locals.requestId);
+        const queryClient = typeof request.query.client_id === 'string' ? request.query.client_id : null;
+        const authorization = request.header('authorization') ?? '';
+        let basicClient: string | null = null;
+        if (/^Basic\s/i.test(authorization)) {
+          try {
+            const decoded = Buffer.from(authorization.slice(6), 'base64').toString('utf8');
+            const separator = decoded.indexOf(':');
+            if (separator > 0) basicClient = decoded.slice(0, separator);
+          } catch {
+            basicClient = null;
+          }
+        }
+        response.once('finish', () => {
+          const status = response.statusCode;
+          const outcome = status >= 500 ? 'failure' : status >= 400 ? 'denied' : 'success';
+          void recordProtocolEvent({
+            requestId,
+            endpoint,
+            outcome,
+            status,
+            durationMs: Math.max(0, Date.now() - startedAt),
+            clientId: queryClient ?? basicClient,
+          }).catch(() => {
+            process.stderr.write(JSON.stringify({ event: 'protocol_audit_write_failed', requestId, endpoint }) + '\\n');
+          });
+        });
+        next();
+      });
+    }
+    app.use(provider.callback());
+  }
 
   app.use((_request, response) => {
     response.status(404).json({
