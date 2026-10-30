@@ -292,18 +292,28 @@ export function createAdminRouter(
 
   router.get('/audit', async (request, response) => {
     if (!await adminSession(request)) return response.redirect(303, '/admin/login');
-    const page = typeof request.query.page === 'string' && /^[1-9][0-9]*$/.test(request.query.page)
-      ? Number(request.query.page)
-      : 1;
-    const appId = typeof request.query.applicationId === 'string' && request.query.applicationId.length <= 80
-      ? request.query.applicationId
-      : null;
-    const outcome = typeof request.query.outcome === 'string'
-      ? request.query.outcome
-      : null;
-    if (!Number.isSafeInteger(page) || page < 1 || (outcome && !['success', 'denied', 'failure'].includes(outcome))) {
-      return sendError(response, 400, '筛选条件无效。');
-    }
+    const pageText = typeof request.query.page === 'string' ? request.query.page : '1';
+    const page = /^[1-9][0-9]*$/.test(pageText) ? Number(pageText) : Number.NaN;
+    const appText = request.query.applicationId;
+    const appId = appText === undefined ? null : scalar(appText);
+    const outcomeText = request.query.outcome;
+    const outcome = outcomeText === undefined || outcomeText === '' ? null : scalar(outcomeText);
+    const actionText = request.query.action;
+    const action = actionText === undefined || actionText === '' ? null : scalar(actionText);
+    const fromText = request.query.from === undefined || request.query.from === '' ? null : scalar(request.query.from);
+    const toText = request.query.to === undefined || request.query.to === '' ? null : scalar(request.query.to);
+    const validDate = (value: string | null): boolean =>
+      value === null || (/^\\d{4}-\\d{2}-\\d{2}$/.test(value) && !Number.isNaN(Date.parse(value + 'T00:00:00.000Z')));
+    if (
+      !Number.isSafeInteger(page) || page < 1 || page > 10000 ||
+      (appId !== null && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(appId)) ||
+      (outcome !== null && !['success', 'denied', 'failure'].includes(outcome)) ||
+      (action !== null && (action.length > 120 || !/^[a-z0-9_.-]+$/i.test(action))) ||
+      !validDate(fromText) || !validDate(toText)
+    ) return sendError(response, 400, '筛选条件无效。');
+    const from = fromText ? new Date(fromText + 'T00:00:00.000Z') : null;
+    const to = toText ? new Date(Date.parse(toText + 'T00:00:00.000Z') + 86400000) : null;
+    if (from && to && from >= to) return sendError(response, 400, '开始日期必须早于结束日期。');
     try {
       const offset = (page - 1) * 50;
       if (!Number.isSafeInteger(offset)) return sendError(response, 400, '页码无效。');
@@ -316,8 +326,11 @@ export function createAdminRouter(
         outcome: string;
         details: unknown;
       }>(
-        'SELECT created_at, actor_type, actor_id, action, application_id, outcome, details FROM platform_audit WHERE ($1::text IS NULL OR application_id::text = $1) AND ($2::text IS NULL OR outcome = $2) ORDER BY created_at DESC, id DESC LIMIT 50 OFFSET $3',
-        [appId, outcome, offset],
+        'SELECT created_at, actor_type, actor_id, action, application_id, outcome, details FROM platform_audit ' +
+        'WHERE ($1::uuid IS NULL OR application_id = $1::uuid) AND ($2::text IS NULL OR outcome = $2) ' +
+        'AND ($3::text IS NULL OR action = $3) AND ($4::timestamptz IS NULL OR created_at >= $4) ' +
+        'AND ($5::timestamptz IS NULL OR created_at < $5) ORDER BY created_at DESC, id DESC LIMIT 50 OFFSET $6',
+        [appId, outcome, action, from?.toISOString() ?? null, to?.toISOString() ?? null, offset],
       );
       const rows = result.rows.map((row) =>
         '<tr><td>' + escapeHtml(new Date(row.created_at).toISOString()) + '</td><td>' +
@@ -325,7 +338,28 @@ export function createAdminRouter(
         '</td><td>' + escapeHtml(row.action) + '</td><td>' + escapeHtml(row.application_id ?? '') +
         '</td><td>' + escapeHtml(row.outcome) + '</td><td><pre>' + escapeHtml(JSON.stringify(row.details)) + '</pre></td></tr>',
       ).join('');
-      response.type('html').send(html('操作审计', '<table><thead><tr><th>时间</th><th>类型</th><th>操作者</th><th>操作</th><th>应用</th><th>结果</th><th>详情</th></tr></thead><tbody>' + rows + '</tbody></table>'));
+      const filter = '<form method="get" action="/admin/audit"><label for="applicationId">应用 ID</label><input id="applicationId" name="applicationId" value="' +
+        escapeHtml(appId ?? '') + '"><label for="from">开始日期（UTC）</label><input id="from" name="from" type="date" value="' +
+        escapeHtml(fromText ?? '') + '"><label for="to">结束日期（UTC，包含当天）</label><input id="to" name="to" type="date" value="' +
+        escapeHtml(toText ?? '') + '"><label for="action">操作类型</label><input id="action" name="action" maxlength="120" value="' +
+        escapeHtml(action ?? '') + '"><label for="outcome">结果</label><select id="outcome" name="outcome">' +
+        '<option value="">全部</option><option value="success"' + (outcome === 'success' ? ' selected' : '') + '>success</option>' +
+        '<option value="denied"' + (outcome === 'denied' ? ' selected' : '') + '>denied</option><option value="failure"' +
+        (outcome === 'failure' ? ' selected' : '') + '>failure</option></select><button type="submit">筛选</button></form>';
+      const params = new URLSearchParams();
+      if (appId) params.set('applicationId', appId);
+      if (fromText) params.set('from', fromText);
+      if (toText) params.set('to', toText);
+      if (action) params.set('action', action);
+      if (outcome) params.set('outcome', outcome);
+      const prevParams = new URLSearchParams(params); prevParams.set('page', String(page - 1));
+      const nextParams = new URLSearchParams(params); nextParams.set('page', String(page + 1));
+      const paging = '<p>第 ' + page + ' 页</p>' +
+        (page > 1 ? '<a href="/admin/audit?' + escapeHtml(prevParams.toString()) + '">上一页</a> ' : '') +
+        (result.rows.length === 50 ? '<a href="/admin/audit?' + escapeHtml(nextParams.toString()) + '">下一页</a>' : '');
+      response.type('html').send(html('操作审计', filter + paging +
+        '<table><thead><tr><th>时间（UTC）</th><th>类型</th><th>操作者</th><th>操作</th><th>应用</th><th>结果</th><th>详情</th></tr></thead><tbody>' +
+        (rows || '<tr><td colspan="7">没有符合条件的记录。</td></tr>') + '</tbody></table>' + paging));
     } catch {
       sendError(response, 503, '审计记录暂时不可用。');
     }
