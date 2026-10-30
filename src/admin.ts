@@ -5,6 +5,7 @@ import type { Pool } from 'pg';
 
 import type { ServiceConfig } from './config.js';
 import type { ApplicationStatus, ApplicationService, ReviewCommand } from './platform.js';
+import { ApplicationGroupError, type ApplicationGroupService } from './groups.js';
 import { constantTimeEqual, escapeHtml, randomToken, verifyScryptPassword } from './security.js';
 
 const SECURE_COOKIE = '__Host-dt-admin';
@@ -50,7 +51,7 @@ function html(title: string, content: string): string {
     'main{border:1px solid #dce3ec;border-radius:12px;padding:1.5rem}label{display:block;margin:1rem 0 .35rem}' +
     'input,select,textarea,button{font:inherit;padding:.65rem;box-sizing:border-box}input,textarea{width:100%}' +
     'button{margin:.7rem .5rem .2rem 0;cursor:pointer}pre{white-space:pre-wrap;background:#f3f5f7;padding:1rem}</style>' +
-    '<main><nav><a href="/admin/applications">审核队列</a> · <a href="/admin/audit">操作审计</a> · <a href="/admin/statistics">统计</a></nav><h1>' + escapeHtml(title) + '</h1>' + content + '</main></html>';
+    '<main><nav><a href="/admin/applications">应用审核</a> · <a href="/admin/groups">应用组</a> · <a href="/admin/audit">操作审计</a> · <a href="/admin/statistics">统计</a></nav><h1>' + escapeHtml(title) + '</h1>' + content + '</main></html>';
 }
 
 function sendError(response: Response, status: number, message: string): void {
@@ -65,6 +66,7 @@ export function createAdminRouter(
   pool: Pool,
   config: ServiceConfig,
   applications: ApplicationService,
+  groups: ApplicationGroupService,
 ): Router {
   const router = Router();
   router.use(express.urlencoded({ extended: false, limit: '16kb', parameterLimit: 20 }));
@@ -215,6 +217,76 @@ export function createAdminRouter(
       response.type('html').send(html('应用审核', content));
     } catch {
       sendError(response, 503, '审核队列暂时不可用。');
+    }
+  });
+
+  router.get('/groups', async (request, response) => {
+    if (!await adminSession(request)) return response.redirect(303, '/admin/login');
+    const page = typeof request.query.page === 'string' && /^[1-9][0-9]*$/.test(request.query.page)
+      ? Number(request.query.page)
+      : 1;
+    try {
+      const result = await groups.listForAdmin('pending', page, 20);
+      const rows = result.list.map((group) =>
+        '<tr><td><a href="/admin/groups/' + encodeURIComponent(group.id) + '">' +
+        escapeHtml(group.displayName) + '</a></td><td>' + escapeHtml(group.ownerUuid) +
+        '</td><td>' + group.revision + '</td></tr>',
+      ).join('');
+      response.type('html').send(html('应用组审核', '<p>待审数量：' + result.total + '</p><table><thead><tr><th>名称</th><th>申请人</th><th>版本</th></tr></thead><tbody>' + rows + '</tbody></table>'));
+    } catch {
+      sendError(response, 503, '应用组队列暂时不可用。');
+    }
+  });
+
+  router.get('/groups/:id', async (request, response) => {
+    if (!await adminSession(request)) return response.redirect(303, '/admin/login');
+    try {
+      const group = await groups.getForAdmin(request.params.id);
+      if (!group) return sendError(response, 404, '应用组不存在。');
+      const csrf = csrfPageToken(response);
+      const reviewForm = group.status === 'pending'
+        ? '<form method="post" action="/admin/groups/' + encodeURIComponent(group.id) + '/review">' +
+          '<input type="hidden" name="csrf" value="' + escapeHtml(csrf) + '">' +
+          '<input type="hidden" name="expectedRevision" value="' + group.revision + '">' +
+          '<label for="reason">驳回理由（驳回时必填）</label><textarea id="reason" name="reason" maxlength="2000"></textarea>' +
+          '<button name="action" value="approve">批准</button><button name="action" value="reject">驳回</button></form>'
+        : group.status === 'approved'
+          ? '<form method="post" action="/admin/groups/' + encodeURIComponent(group.id) + '/review">' +
+            '<input type="hidden" name="csrf" value="' + escapeHtml(csrf) + '">' +
+            '<input type="hidden" name="expectedRevision" value="' + group.revision + '">' +
+            '<label for="reason">停用理由</label><textarea id="reason" name="reason" required maxlength="2000"></textarea>' +
+            '<button name="action" value="disable">停用</button></form>'
+          : '';
+      const content = '<p>状态：' + escapeHtml(group.status) + '；修订：' + group.revision + '</p>' +
+        '<p>所有者：' + escapeHtml(group.ownerUuid) + '</p><p>最近审核：' +
+        escapeHtml(JSON.stringify(group.lastReview)) + '</p>' + reviewForm;
+      response.type('html').send(html('应用组详情', content));
+    } catch {
+      sendError(response, 503, '应用组详情暂时不可用。');
+    }
+  });
+
+  router.post('/groups/:id/review', async (request, response) => {
+    if (!enforceForm(request, response)) return;
+    if (!await adminSession(request)) return sendError(response, 401, '管理员会话已过期。');
+    const input = body(request);
+    const action = scalar(input.action);
+    const revision = typeof input.expectedRevision === 'string' ? Number(input.expectedRevision) : Number.NaN;
+    const reason = scalar(input.reason) ?? '';
+    if (!['approve', 'reject', 'disable'].includes(String(action)) || !Number.isSafeInteger(revision)) {
+      return sendError(response, 400, '审核操作无效。');
+    }
+    try {
+      const group = await groups.review(request.params.id, revision, {
+        action: action as 'approve' | 'reject' | 'disable',
+        reviewerUuid: 'admin:' + config.admin.username,
+        ...(action === 'approve' ? {} : { reason }),
+      });
+      if (!group) return sendError(response, 404, '应用组不存在。');
+      response.redirect(303, '/admin/groups/' + encodeURIComponent(group.id));
+    } catch (error) {
+      if (error instanceof ApplicationGroupError) return sendError(response, 409, '应用组状态或修订已变化，请重新打开详情。');
+      sendError(response, 503, '应用组审核暂时不可用。');
     }
   });
 
