@@ -17,7 +17,8 @@
     "admin:password": "tsx scripts/admin-password.ts",
     "test": "tsx --test test/*.test.ts",
     "test:storage": "tsx --test test/storage/*.test.ts",
-    "migrate": "node dist/scripts/migrate.js"
+    "migrate": "node dist/scripts/migrate.js",
+    "clean:expired": "node dist/scripts/clean-expired.js"
   },
   "dependencies": {
     "express": "5.3.0",
