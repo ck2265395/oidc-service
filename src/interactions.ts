@@ -177,13 +177,14 @@ export function createInteractionRouter(
       if (details.uid !== request.params.uid || details.prompt.name !== 'login') return errorPage(response);
       const clientId = stringParam(details.params.client_id);
       if (!clientId) return errorPage(response);
-      const active = await applications.activeClient(clientId);
-      if (!active) return errorPage(response);
+      const isPortalClient = clientId === PORTAL_CLIENT_ID;
+      const active = isPortalClient ? null : await applications.activeClient(clientId);
+      if (!isPortalClient && !active) return errorPage(response);
       const sourceAddress = request.ip || request.socket.remoteAddress || 'unknown';
       const identity = await accounts.authenticate(
         { type, value: identifier },
         password,
-        active.config.groupId ?? clientId,
+        active?.config.groupId ?? clientId,
         (accountUuid) => rateLimiter.consume(accountUuid, type, identifier, sourceAddress),
       );
       if (!identity) return response.status(401).type('html').send(
