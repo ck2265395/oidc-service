@@ -175,7 +175,7 @@ export function createInteractionRouter(
       if (!clientId) return errorPage(response);
       const active = await applications.activeClient(clientId);
       if (!active) return errorPage(response);
-      await rateLimiter.consume(type, identifier, request.socket.remoteAddress ?? 'unknown');
+      await rateLimiter.consume(type, identifier, request.ip || request.socket.remoteAddress || 'unknown');
       const identity = await accounts.authenticate(
         { type, value: identifier },
         password,
