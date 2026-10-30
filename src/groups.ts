@@ -27,6 +27,7 @@ export interface ApplicationGroupPage {
 export interface ApplicationGroupRepository {
   createGroup(record: ApplicationGroupRecord): Promise<void>;
   renameGroup(previous: ApplicationGroupRecord, next: ApplicationGroupRecord): Promise<boolean>;
+  deleteGroup(record: ApplicationGroupRecord): Promise<boolean>;
   getOwnedGroup(id: string, ownerUuid: string): Promise<ApplicationGroupRecord | null>;
   getGroup(id: string): Promise<ApplicationGroupRecord | null>;
   listOwnedGroups(ownerUuid: string, page: number, pageSize: number): Promise<ApplicationGroupPage>;
@@ -101,6 +102,21 @@ export class ApplicationGroupService {
     };
     if (!await this.repository.renameGroup(record, next)) throw new ApplicationGroupError();
     return next;
+  }
+
+  async delete(id: string, ownerUuid: string, expectedRevision: number): Promise<boolean> {
+    const record = await this.repository.getOwnedGroup(id, ownerUuid);
+    if (!record) return false;
+    if (!Number.isSafeInteger(expectedRevision) || record.revision !== expectedRevision) {
+      throw new ApplicationGroupError();
+    }
+    if (!['pending', 'rejected'].includes(record.status)) {
+      throw new ApplicationGroupError('Only pending or rejected groups can be deleted');
+    }
+    if (!await this.repository.deleteGroup(record)) {
+      throw new ApplicationGroupError('The group is in use or has changed');
+    }
+    return true;
   }
 
   async getForAdmin(id: string): Promise<ApplicationGroupRecord | null> {
