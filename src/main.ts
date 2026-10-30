@@ -79,7 +79,8 @@ export async function start(): Promise<void> {
       config.secrets.cookie,
       signingKeys,
     );
-    applications.setClientCacheClearer((clientId) => provider.Client.cacheClear(clientId));
+    const providerClient = provider.Client as typeof provider.Client & { cacheClear: (clientId?: string) => void };
+    applications.setClientCacheClearer((clientId) => providerClient.cacheClear(clientId));
     const interactions = createInteractionRouter(
       provider,
       accounts,
