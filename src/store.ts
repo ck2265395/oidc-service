@@ -45,6 +45,7 @@ export interface ApplicationRepository {
     next: ApplicationRecord,
     reviewEvent?: ReviewRecord | null,
   ): Promise<boolean>;
+  listForAdmin?(page: number, pageSize: number, status?: ApplicationStatus): Promise<ApplicationPage>;
   listOwned(
     ownerUuid: string,
     page: number,
@@ -329,6 +330,39 @@ export class PostgresApplicationRepository implements ApplicationRepository {
       throw new PlatformStorageError();
     } finally {
       connection.release();
+    }
+  }
+
+  async listForAdmin(
+    page: number,
+    pageSize: number,
+    status: ApplicationStatus = 'pending',
+  ): Promise<ApplicationPage> {
+    if (
+      !Number.isSafeInteger(page) || page < 1 ||
+      !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100 ||
+      !['draft', 'pending', 'rejected', 'approved', 'disabled'].includes(status)
+    ) {
+      throw new ApplicationConflictError('Invalid pagination');
+    }
+    const offset = (page - 1) * pageSize;
+    if (!Number.isSafeInteger(offset)) throw new ApplicationConflictError('Invalid pagination');
+    try {
+      const count = await this.pool.query<{ count: string }>(
+        'SELECT count(*)::text AS count FROM oidc_application WHERE status = $1',
+        [status],
+      );
+      const rows = await this.pool.query<ApplicationRow>(
+        'SELECT ' + APPLICATION_COLUMNS + ' FROM oidc_application WHERE status = $1 ORDER BY updated_at DESC, id DESC LIMIT $2 OFFSET $3',
+        [status, pageSize, offset],
+      );
+      return {
+        total: Number(count.rows[0]?.count ?? '0'),
+        list: rows.rows.map((row) => mapApplicationRow(row, this.environment)),
+      };
+    } catch (error) {
+      if (error instanceof ApplicationConflictError || error instanceof PlatformStorageError) throw error;
+      throw new PlatformStorageError();
     }
   }
 
