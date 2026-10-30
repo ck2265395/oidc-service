@@ -14,6 +14,14 @@ export interface ReviewRecord {
   reviewedAt: string;
 }
 
+export interface DeveloperProfileRecord {
+  accountUuid: string;
+  displayName: string;
+  contactEmail: string;
+  contactEmailVerified: boolean;
+  revision: number;
+}
+
 export interface ApplicationRecord {
   id: string;
   ownerUuid: string;
@@ -180,6 +188,49 @@ export class ApplicationService {
 
   setClientCacheClearer(clear: (clientId: string) => void): void {
     this.clearClientCache = clear;
+  }
+
+  async getDeveloperProfile(accountUuid: string): Promise<DeveloperProfileRecord | null> {
+    if (!this.repository.getDeveloperProfile) throw new ApplicationConflictError('Developer profile storage is unavailable');
+    return this.repository.getDeveloperProfile(accountUuid);
+  }
+
+  async saveDeveloperProfile(
+    accountUuid: string,
+    input: unknown,
+    expectedRevision: number,
+  ): Promise<DeveloperProfileRecord> {
+    if (!accountUuid || accountUuid.length > 255 || !this.repository.saveDeveloperProfile) {
+      throw new ApplicationConflictError('Developer profile storage is unavailable');
+    }
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+      throw new ApplicationConflictError('Developer profile is invalid');
+    }
+    const value = input as Record<string, unknown>;
+    const displayName = value.displayName;
+    const contactEmail = value.contactEmail;
+    if (
+      typeof displayName !== 'string' ||
+      displayName.trim() !== displayName ||
+      displayName.length < 1 ||
+      displayName.length > 100 ||
+      typeof contactEmail !== 'string' ||
+      contactEmail.trim() !== contactEmail ||
+      contactEmail.length > 254 ||
+      !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(contactEmail) ||
+      !Number.isSafeInteger(expectedRevision) ||
+      expectedRevision < 0
+    ) {
+      throw new ApplicationConflictError('Developer profile fields or revision are invalid');
+    }
+    const saved = await this.repository.saveDeveloperProfile(
+      accountUuid,
+      displayName,
+      contactEmail,
+      expectedRevision,
+    );
+    if (!saved) throw new ApplicationConflictError();
+    return saved;
   }
 
   async create(ownerUuid: string, type: ClientType, input: unknown): Promise<ApplicationRecord> {
