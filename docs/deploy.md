@@ -11,7 +11,7 @@ The account database is never migrated or written by this service. Configure its
 
 ## Container deployment
 
-1. Copy `config.example.json` to `runtime/config.json` and replace every placeholder with actual protected values. Set the OIDC database URL to `oidc-db` and Redis URL to `redis` for the Compose network. Configure the account database URL using a host reachable from the container.
+1. Copy `config.example.json` to `runtime/config.json`, set `port` to `3000`, and replace every placeholder with actual protected values. Set the OIDC database URL to `oidc-db` and Redis URL to `redis` for the Compose network. Configure the account database URL using a host reachable from the container.
 2. Set `mode` to `production`, configure the public HTTPS `issuer`, and list only actual reverse-proxy CIDRs in `trustedProxyCidrs`.
 3. Generate signing material outside the repository with `npm run keys -- --out runtime/signing.json`; provide the other generated keys in the protected configuration. Create an administrator password hash with `npm run admin:password`.
 4. Set `OIDC_DB_PASSWORD` to the same strong password configured in the OIDC database URL and Compose environment. Keep `runtime/` out of version control.
