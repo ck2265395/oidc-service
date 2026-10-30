@@ -13,7 +13,7 @@
 
 包含只读账号认证、OIDC 登录和授权同意交互、用户资料与授权管理页、`/api/v1/me` 当前用户资料 API、开发者 API 与 `/developer` 双语界面、AES-GCM 加密的 Web 客户端密钥生成与轮换，以及独立管理员应用/应用组审核页面、操作审计和状态统计。开发者界面支持开发者资料、应用草稿、审核提交、应用组申请和改名、删除未被应用引用的待审或已驳回组，以及密钥轮换；未登录时可从页面直接进入门户登录。已批准的 SPA/native 客户端使用公开客户端认证。
 
-服务首页 `/`、开发者中心 `/developer` 与门户授权页 `/portal/authorizations` 已提供；门户使用 OIDC Authorization Code + PKCE 登录。可运行的 Web 客户端示例见 [examples/web-client](examples/web-client)，Native 客户端示例见 [examples/native](examples/native)。GitHub Actions 使用临时 PostgreSQL 17 与 Redis 7 执行存储集成检查。联系邮箱验证支持可选 SMTP 配置；实际 SMTP 投递、真实账号库和目标网络端到端验收、生产级升级迁移及目标环境综合验收仍待完成。API 路由见 [docs/api.md](docs/api.md)，部署步骤见 [docs/deploy.md](docs/deploy.md)，实施限制见 [docs/progress.md](docs/progress.md)。
+服务首页 `/`、开发者中心 `/developer` 与门户授权页 `/portal/authorizations` 已提供；门户使用 OIDC Authorization Code + PKCE 登录。可运行的 Web 客户端示例见 [examples/web-client](examples/web-client)，Native 客户端示例见 [examples/native](examples/native)。GitHub Actions 使用临时 PostgreSQL 17 与 Redis 7 执行存储集成检查。联系邮箱验证支持可选 SMTP 配置；实际 SMTP 投递、真实账号库和目标网络端到端验收、生产级升级迁移及目标环境综合验收仍待完成。API 路由见 [docs/api.md](docs/api.md)，部署步骤见 [docs/deploy.md](docs/deploy.md)，直接依赖许可索引见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)，实施限制见 [docs/progress.md](docs/progress.md)。CI 归档生产依赖 SBOM，Dependabot 定期提出依赖更新。
 
 ## 检查
 
