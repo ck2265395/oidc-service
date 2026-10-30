@@ -90,7 +90,7 @@ test('PostgreSQL repositories and Redis security controls work across connection
       await pool.query('DELETE FROM platform_audit WHERE application_id = $1', [applicationId]);
       await pool.query('DELETE FROM oidc_application WHERE id = $1', [applicationId]);
     }
-    await pool.query('DELETE FROM application_group_review_history WHERE group_id = $1', [groupId]).catch(() => {});
+    await pool.query('DELETE FROM application_group_review_history WHERE group_id = $1', [groupId]);
     await pool.query('DELETE FROM application_group WHERE id = $1', [groupId]);
     await pool.query('DELETE FROM developer_profile WHERE account_uuid = $1', [ownerUuid]);
     await Promise.allSettled([redisA.quit(), redisB.quit(), pool.end()]);
