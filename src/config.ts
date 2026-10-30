@@ -26,6 +26,7 @@ export interface ServiceConfig {
   loginRateLimit: { windowSeconds: number; accountAttempts: number; ipAttempts: number };
   smtp: { host: string; port: number; secure: boolean; user: string | null; password: string | null; from: string } | null;
   accountPortal: { registrationUrl: string | null; passwordResetUrl: string | null; profileUrl: string | null } | null;
+  profilePictureBaseUrl: string | null;
 }
 
 export class ConfigError extends Error {
@@ -133,6 +134,14 @@ function trustedProxyCidrsAt(value: unknown): string[] {
     }
     return entry;
   });
+}
+
+function profilePictureBaseUrlAt(value: unknown, mode: RuntimeMode): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  const url = urlAt(value, 'profilePictureBaseUrl', ['https:', ...(mode === 'production' ? [] : ['http:'])]);
+  const parsed = new URL(url);
+  if (parsed.search || parsed.hash) throw new ConfigError('profilePictureBaseUrl must not contain query or fragment');
+  return url.endsWith('/') ? url : url + '/';
 }
 
 function accountPortalAt(value: unknown, mode: RuntimeMode): ServiceConfig['accountPortal'] {
@@ -244,5 +253,6 @@ export function loadConfig(input: unknown): ServiceConfig {
     loginRateLimit: rateLimitConfigAt(root.loginRateLimit),
     smtp: smtpConfigAt(root.smtp),
     accountPortal: accountPortalAt(root.accountPortal, mode),
+    profilePictureBaseUrl: profilePictureBaseUrlAt(root.profilePictureBaseUrl, mode),
   };
 }
