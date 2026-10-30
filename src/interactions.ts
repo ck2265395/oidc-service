@@ -6,6 +6,7 @@ import type Provider from 'oidc-provider';
 import { AccountService, type LoginType } from './accounts.js';
 import { accountHandle } from './provider.js';
 import type { ApplicationService } from './platform.js';
+import { LoginRateLimitError, type RedisLoginRateLimiter } from './login-limiter.js';
 import { escapeHtml } from './security.js';
 
 const COOKIE_NAME = '__Host-dt-csrf';
@@ -101,6 +102,7 @@ export function createInteractionRouter(
   applications: ApplicationService,
   csrfKey: string,
   secureCookies: boolean,
+  rateLimiter: RedisLoginRateLimiter,
 ): Router {
   const router = Router();
   router.use(express.urlencoded({ extended: false, limit: '16kb', parameterLimit: 20 }));
@@ -173,6 +175,7 @@ export function createInteractionRouter(
       if (!clientId) return errorPage(response);
       const active = await applications.activeClient(clientId);
       if (!active) return errorPage(response);
+      await rateLimiter.consume(type, identifier, request.socket.remoteAddress ?? 'unknown');
       const identity = await accounts.authenticate(
         { type, value: identifier },
         password,
@@ -185,7 +188,11 @@ export function createInteractionRouter(
       await provider.interactionFinished(request, response, {
         login: { accountId: accountHandle(identity.uuid, identity.fingerprint), remember: true, ts: Math.floor(Date.now() / 1000) },
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof LoginRateLimitError) {
+        response.setHeader('Retry-After', String(error.retryAfterSeconds));
+        return response.status(429).type('html').send(page('请稍后重试', '<p>登录尝试次数过多，请稍后再试。</p>'));
+      }
       return errorPage(response, 503);
     }
   });
