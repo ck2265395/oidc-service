@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:http';
 
 import type { JWKS } from 'oidc-provider';
+import { createClient } from 'redis';
 
 import { AccountService, createAccountPool, PostgresAccountSource } from './accounts.js';
 import { createApplication } from './app.js';
@@ -16,6 +17,7 @@ import { createUserPortalRouter } from './user-portal.js';
 import { ApplicationService } from './platform.js';
 import { ApplicationGroupService } from './groups.js';
 import { createPlatformPool, PostgresApplicationRepository } from './store.js';
+import { RedisLoginRateLimiter } from './login-limiter.js';
 
 function record(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -57,6 +59,8 @@ export async function start(): Promise<void> {
   const config = loadConfig(rawConfig);
   const oidcPool = createPlatformPool(config.databases.oidc);
   const accountPool = createAccountPool(config.databases.accounts);
+  const redisClient = createClient({ url: config.redisUrl });
+  redisClient.on('error', () => {});
   const accountSource = new PostgresAccountSource(accountPool);
   const applicationRepository = new PostgresApplicationRepository(oidcPool, config.mode === 'production' ? 'production' : 'development');
   const applications = new ApplicationService(
@@ -75,7 +79,8 @@ export async function start(): Promise<void> {
   const signingKeys = await readSigningKeys();
 
   try {
-    await Promise.all([oidcPool.query('SELECT 1'), accountPool.query('SELECT 1')]);
+    await Promise.all([oidcPool.query('SELECT 1'), accountPool.query('SELECT 1'), redisClient.connect()]);
+    const loginRateLimiter = new RedisLoginRateLimiter(redisClient, config.secrets.fingerprint);
     const provider = createProvider(
       config.issuer,
       createOidcAdapterFactory(oidcPool, applications),
@@ -92,6 +97,7 @@ export async function start(): Promise<void> {
       applications,
       config.secrets.cookie,
       config.issuer.startsWith('https:'),
+      loginRateLimiter,
     );
     const developer = createDeveloperRouter(
       provider,
@@ -115,7 +121,7 @@ export async function start(): Promise<void> {
 
     const shutdown = (): void => {
       server.close((error) => {
-        void Promise.all([oidcPool.end(), accountPool.end()]).then(() => {
+        void Promise.all([oidcPool.end(), accountPool.end(), redisClient.isOpen ? redisClient.quit() : Promise.resolve()]).then(() => {
           if (error) process.exitCode = 1;
         });
       });
@@ -123,7 +129,7 @@ export async function start(): Promise<void> {
     process.once('SIGTERM', shutdown);
     process.once('SIGINT', shutdown);
   } catch (error) {
-    await Promise.allSettled([oidcPool.end(), accountPool.end()]);
+    await Promise.allSettled([oidcPool.end(), accountPool.end(), redisClient.isOpen ? redisClient.quit() : Promise.resolve()]);
     throw error;
   }
 }
