@@ -1,19 +1,25 @@
 # Development progress
 
-Status date: 2026-10-30 (Asia/Shanghai)
+Status date: 2026-10-30 (UTC)
 
-This repository started with only a short README and a license file. The source tree described in the project handoff was not present on the connected GitHub branch, so implementation is proceeding from a clean foundation. This page contains only public-safe progress notes; the full product requirements remain outside the public repository.
+This page records public-safe implementation status. Detailed product requirements are maintained outside this public repository.
 
-## Current milestone
+## Completed foundation
 
-### T01 — service foundation
+- Added strict JSON configuration validation, protected key generation, administrator password hashing, request IDs, safe health/error responses, and GitHub Actions checks.
+- Added read-only account lookup, legacy password verification, stable sector-specific subjects, credential-version checks, and scope-limited claims.
+- Added client registration validation for web, SPA, and native client metadata.
+- Added revision-checked application drafts, review states, preserved approved snapshots, owner-scoped queries, and PostgreSQL persistence with review history.
+- Added a PostgreSQL oidc-provider adapter for persisted grants, codes, tokens, and sessions, including expiry and replay protection.
+- Added provider configuration for upstream oidc-provider, persistent signing keys, RS256, S256 PKCE, authorization-code-only clients, and the supported openid/profile/email scopes.
+- Connected provider startup to the OIDC database and read-only account database.
 
-- Added strict JSON configuration parsing and validation for issuer, secrets, administrator credentials, PostgreSQL URLs, Redis URL, and port.
-- Added an injectable Express application with a non-caching liveness endpoint, request IDs, a generic not-found response, and sanitized error responses.
-- Added startup configuration loading, strict TypeScript settings, ESLint configuration, sample configuration, and an initial GitHub Actions workflow.
-- Added configuration and HTTP behavior tests.
-- Not yet verified: dependency lockfile, remote CI execution, full OIDC flow, real database/Redis access, container build, and application integration examples.
+## Current limitations
 
-### Remaining milestones
+- Interactive login and consent routes are not implemented; authorization requests cannot yet complete.
+- Client-secret creation, encrypted storage, one-time delivery, and rotation are not implemented. The current adapter deliberately does not load confidential web clients.
+- Developer and user portals, administrator review UI/API, application-group workflows, account consent revocation, and audit views remain incomplete.
+- Redis integration, real PostgreSQL/Redis integration coverage, container packaging, deployment guidance, and end-to-end protocol acceptance remain incomplete.
+- The public branch is a development branch. No production readiness or complete OIDC service is claimed.
 
-Protocol, account lookup, application onboarding and review, user portal, administrator portal, storage integration, client examples, operations, and acceptance verification remain in progress. No production readiness or completed OIDC integration is claimed.
+The detailed internal requirements were not copied to the public repository.
