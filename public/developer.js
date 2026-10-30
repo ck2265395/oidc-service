@@ -19,7 +19,7 @@ const t = {
     submitted:'已提交审核。',rotated:'密钥已轮换，旧密钥已立即失效。',copied:'密钥已复制。',copyFailed:'复制失败，请手动复制。',
     loadFailed:'暂时无法加载数据。请稍后重试。',emptyApps:'还没有应用。创建一个应用草稿以开始。',emptyGroups:'还没有应用组申请。',
     edit:'编辑',submit:'提交审核',rotate:'轮换密钥',rename:'改名',revision:'版本',appTypes:{web:'Web',spa:'SPA',native:'Native'},
-    groupApproved:'已批准',groupPending:'审核中',groupRejected:'已驳回',groupDisabled:'已停用',
+    groupApproved:'已批准',groupPending:'审核中',groupRejected:'已驳回',groupDisabled:'已停用',deleteGroup:'删除',confirmDeleteGroup:'删除此应用组？仅未被应用引用的待审或已驳回组可以删除。',
     noSecret:'该客户端不使用密钥。',secretWarning:'密钥只显示这一次，请先妥善保存再关闭。',
     loadProfileError:'开发者资料加载失败。',groupError:'应用组操作失败。',requestError:'操作失败。',
     confirmSubmit:'确认将此版本提交审核？',confirmRotate:'轮换后旧密钥立即失效。确定继续？',
@@ -44,7 +44,7 @@ const t = {
     submitted:'Submitted for review.',rotated:'Secret rotated. The previous secret is now invalid.',copied:'Secret copied.',copyFailed:'Copy failed. Copy the value manually.',
     loadFailed:'Could not load the data. Please try again later.',emptyApps:'No applications yet. Create a draft to get started.',emptyGroups:'No group requests yet.',
     edit:'Edit',submit:'Submit',rotate:'Rotate secret',rename:'Rename',revision:'Revision',appTypes:{web:'Web',spa:'SPA',native:'Native'},
-    groupApproved:'Approved',groupPending:'Pending review',groupRejected:'Rejected',groupDisabled:'Disabled',
+    groupApproved:'Approved',groupPending:'Pending review',groupRejected:'Rejected',groupDisabled:'Disabled',deleteGroup:'Delete',confirmDeleteGroup:'Delete this group? Only pending or rejected groups not referenced by an application can be deleted.',
     noSecret:'This public client does not use a secret.',secretWarning:'This secret is shown only once. Save it before closing.',
     loadProfileError:'Could not load the developer profile.',groupError:'Application group operation failed.',requestError:'Operation failed.',
     confirmSubmit:'Submit this revision for review?',confirmRotate:'The current secret will stop working immediately. Continue?',
@@ -110,7 +110,7 @@ function renderGroups(){
   target.innerHTML=state.groups.map(group=>{
     const canRename=['pending','rejected'].includes(group.status);
     return '<article class="record"><div class="record-main"><div class="record-title">'+escapeHtml(group.displayName)+'</div><div class="record-meta">'+escapeHtml(statusName(group.status))+' · ID '+escapeHtml(group.id)+' · '+escapeHtml(tr('revision'))+' '+group.revision+'</div></div>'+
-      (canRename?'<div class="record-actions"><button class="button button-quiet" data-action="rename-group" data-id="'+escapeHtml(group.id)+'">'+escapeHtml(tr('rename'))+'</button></div>':'')+'</article>'
+      (canRename?'<div class="record-actions"><button class="button button-quiet" data-action="rename-group" data-id="'+escapeHtml(group.id)+'">'+escapeHtml(tr('rename'))+'</button><button class="button button-quiet" data-action="delete-group" data-id="'+escapeHtml(group.id)+'">'+escapeHtml(tr('deleteGroup'))+'</button></div>':'')+'</article>'
   }).join('');
 }
 async function refresh(){
@@ -188,8 +188,17 @@ document.querySelector('#application-list').addEventListener('click',async event
   }catch(error){notice(error.message==='AUTH_REQUIRED'?tr('loginRequired'):error.message,'error')}
 });
 document.querySelector('#group-list').addEventListener('click',async event=>{
-  const button=event.target.closest('button[data-action="rename-group"]');if(!button)return;
+  const button=event.target.closest('button[data-action]');if(!button)return;
   const group=state.groups.find(item=>item.id===button.dataset.id);if(!group)return;
+  if(button.dataset.action==='delete-group'){
+    if(!window.confirm(tr('confirmDeleteGroup')))return;
+    try{
+      await request('/groups/'+encodeURIComponent(group.id),{method:'DELETE',body:JSON.stringify({expectedRevision:group.revision})});
+      notice(tr('saveOk'));await refresh()
+    }catch(error){notice(error.message==='AUTH_REQUIRED'?tr('loginRequired'):error.message,'error')}
+    return
+  }
+  if(button.dataset.action!=='rename-group')return;
   const name=window.prompt(tr('groupName'),group.displayName);if(name===null)return;
   try{
     await request('/groups/'+encodeURIComponent(group.id),{method:'PUT',body:JSON.stringify({expectedRevision:group.revision,displayName:name})});
