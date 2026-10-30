@@ -11,6 +11,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm install --package-lock-only --ignore-scripts --no-audit --no-fund && npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
 COPY --from=build --chown=node:node /app/dist ./dist
+COPY --from=build --chown=node:node /app/dist/scripts ./dist/scripts
 COPY --from=build --chown=node:node /app/public ./public
 COPY --from=build --chown=node:node /app/sql ./sql
 USER node
