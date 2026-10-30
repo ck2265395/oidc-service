@@ -439,6 +439,18 @@ export class PostgresApplicationRepository implements ApplicationRepository {
         review.reviewedAt,
       ],
     );
+    await connection.query(
+      'INSERT INTO platform_audit (actor_type, actor_id, action, application_id, outcome, details, created_at) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)',
+      [
+        review.reviewerUuid.startsWith('admin:') ? 'admin' : 'system',
+        review.reviewerUuid,
+        'application.' + review.action,
+        next.id,
+        'success',
+        JSON.stringify({ revision: review.revision, status: next.status }),
+        review.reviewedAt,
+      ],
+    );
   }
 
   private async rollbackQuietly(connection: PoolClient): Promise<void> {
