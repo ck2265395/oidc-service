@@ -79,7 +79,7 @@ function page(title: string, content: string): string {
 
 function errorPage(response: Response, status = 400): void {
   response.status(status).type('html').send(
-    page('无法继续', '<p>此登录或授权请求已失效，请从应用重新开始。</p>'),
+    page('无法继续 / Unable to continue', '<p>此登录或授权请求已失效，请从应用重新开始。 / This sign-in or authorization request has expired. Start again from the application.</p>'),
   );
 }
 
@@ -124,10 +124,10 @@ export function createInteractionRouter(
         const form = '<p class="muted">继续使用 ' + escapeHtml(clientName) + ' 登录</p>' +
           '<form method="post" action="/interaction/' + encodeURIComponent(details.uid) + '/login">' +
           '<input type="hidden" name="csrf" value="' + escapeHtml(csrf) + '">' +
-          '<label for="identifierType">登录方式</label><select id="identifierType" name="identifierType">' +
-          '<option value="username">用户名</option><option value="email">邮箱</option></select>' +
-          '<label for="identifier">用户名或邮箱</label><input id="identifier" name="identifier" required maxlength="254" autocomplete="username">' +
-          '<label for="password">密码</label><input id="password" type="password" name="password" required maxlength="1024" autocomplete="current-password">' +
+          '<label for="identifierType">登录方式 / Sign-in method</label><select id="identifierType" name="identifierType">' +
+          '<option value="username">用户名 / Username</option><option value="email">邮箱 / Email</option></select>' +
+          '<label for="identifier">用户名或邮箱 / Username or email</label><input id="identifier" name="identifier" required maxlength="254" autocomplete="username">' +
+          '<label for="password">密码 / Password</label><input id="password" type="password" name="password" required maxlength="1024" autocomplete="current-password">' +
           '<button type="submit">登录并继续 / Sign in and continue</button></form>' +
           '<nav aria-label="账号管理">' +
           (accountPortal?.registrationUrl ? '<a href="' + escapeHtml(accountPortal.registrationUrl) + '" target="_blank" rel="noopener noreferrer">注册账号 / Register</a> ' : '') +
@@ -144,23 +144,23 @@ export function createInteractionRouter(
           : { displayName: 'DT Identity' };
         if (!developer) return errorPage(response);
         const scopeNames: Record<string, string> = {
-          openid: '识别你的身份',
-          profile: '昵称和头像',
-          email: '邮箱地址',
+          openid: '识别你的身份 / Identify you',
+          profile: '昵称和头像 / Nickname and profile picture',
+          email: '邮箱地址 / Email address',
         };
         const list = scopes.map((scope) => '<li>' + escapeHtml(scopeNames[scope] ?? scope) + '</li>').join('');
-        const form = '<p><strong>' + escapeHtml(clientName) + '</strong> 请求以下权限：</p>' +
-          '<dl><dt>开发者</dt><dd>' + escapeHtml(developer.displayName) + '</dd>' +
-          (active ? '<dt>用途</dt><dd>' + escapeHtml(active.config.purpose) + '</dd></dl>' +
-            '<p><a href="' + escapeHtml(active.config.homepageUrl) + '" target="_blank" rel="noopener noreferrer">应用主页</a> · ' +
-            '<a href="' + escapeHtml(active.config.privacyUrl) + '" target="_blank" rel="noopener noreferrer">隐私政策</a> · ' +
-            '<a href="' + escapeHtml(active.config.termsUrl) + '" target="_blank" rel="noopener noreferrer">服务条款</a></p>' : '</dl>') +
+        const form = '<p><strong>' + escapeHtml(clientName) + '</strong> 请求以下权限 / requests these permissions:</p>' +
+          '<dl><dt>开发者 / Developer</dt><dd>' + escapeHtml(developer.displayName) + '</dd>' +
+          (active ? '<dt>用途 / Purpose</dt><dd>' + escapeHtml(active.config.purpose) + '</dd></dl>' +
+            '<p><a href="' + escapeHtml(active.config.homepageUrl) + '" target="_blank" rel="noopener noreferrer">应用主页 / Homepage</a> · ' +
+            '<a href="' + escapeHtml(active.config.privacyUrl) + '" target="_blank" rel="noopener noreferrer">隐私政策 / Privacy</a> · ' +
+            '<a href="' + escapeHtml(active.config.termsUrl) + '" target="_blank" rel="noopener noreferrer">服务条款 / Terms</a></p>' : '</dl>') +
           '<ul>' + list + '</ul>' +
           '<form method="post" action="/interaction/' + encodeURIComponent(details.uid) + '/consent">' +
           '<input type="hidden" name="csrf" value="' + escapeHtml(csrf) + '">' +
-          '<button type="submit" name="decision" value="allow">全部同意</button>' +
-          '<button type="submit" name="decision" value="deny">拒绝</button></form>';
-        return response.type('html').send(page('授权确认', form));
+          '<button type="submit" name="decision" value="allow">全部同意 / Allow all</button>' +
+          '<button type="submit" name="decision" value="deny">拒绝 / Deny</button></form>';
+        return response.type('html').send(page('授权确认 / Consent', form));
       }
 
       return errorPage(response);
@@ -193,8 +193,8 @@ export function createInteractionRouter(
         (accountUuid) => rateLimiter.consume(accountUuid, type, identifier, sourceAddress),
       );
       if (!identity) return response.status(401).type('html').send(
-        page('登录失败', '<p>登录信息不正确或账号当前不可用。</p><p><a href="/interaction/' +
-          encodeURIComponent(details.uid) + '">返回重试</a></p>'),
+        page('登录失败 / Sign-in failed', '<p>登录信息不正确或账号当前不可用。 / Sign-in details are incorrect or the account is unavailable.</p><p><a href="/interaction/' +
+          encodeURIComponent(details.uid) + '">返回重试 / Try again</a></p>'),
       );
       await provider.interactionFinished(request, response, {
         login: { accountId: accountHandle(identity.uuid, identity.fingerprint), remember: true, ts: Math.floor(Date.now() / 1000) },
@@ -202,7 +202,7 @@ export function createInteractionRouter(
     } catch (error) {
       if (error instanceof LoginRateLimitError) {
         response.setHeader('Retry-After', String(error.retryAfterSeconds));
-        return response.status(429).type('html').send(page('请稍后重试', '<p>登录尝试次数过多，请稍后再试。</p>'));
+        return response.status(429).type('html').send(page('请稍后重试 / Try again later', '<p>登录尝试次数过多，请稍后再试。 / Too many sign-in attempts. Try again later.</p>'));
       }
       return errorPage(response, 503);
     }
