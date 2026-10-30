@@ -152,7 +152,7 @@ export async function start(): Promise<void> {
     process.once('SIGTERM', shutdown);
     process.once('SIGINT', shutdown);
   } catch (error) {
-    await Promise.allSettled([oidcPool.end(), accountPool.end(), redisClient.isOpen ? redisClient.quit() : Promise.resolve()]);
+    await Promise.allSettled([oidcPool.end(), accountPool.end(), redisClient.isOpen ? redisClient.quit() : Promise.resolve(), redisSubscriber.isOpen ? redisSubscriber.quit() : Promise.resolve()]);
     throw error;
   }
 }
