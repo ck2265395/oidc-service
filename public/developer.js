@@ -1,5 +1,5 @@
 const API = '/api/v1/developer';
-const state = { csrf: '', language: 'zh', profileRevision: 0, apps: [], groups: [], editing: null };
+const state = { csrf: '', language: 'zh', profileRevision: 0, profile: null, apps: [], groups: [], editing: null };
 const t = {
   zh: {
     secure:'安全会话',eyebrow:'开发者工作区',title:'管理你的身份接入应用',intro:'维护开发者资料、提交应用审核，并查看当前审核状态。',
@@ -24,7 +24,7 @@ const t = {
     loadProfileError:'开发者资料加载失败。',groupError:'应用组操作失败。',requestError:'操作失败。',
     confirmSubmit:'确认将此版本提交审核？',confirmRotate:'轮换后旧密钥立即失效。确定继续？',
     appSaved:'应用草稿已保存。', profileMissing:'请先登记开发者名称和联系邮箱。', copy:'复制',
-    unknownError:'请求失败，请稍后重试。'
+    unknownError:'请求失败，请稍后重试。',verified:'已验证',unverified:'未验证',draft:'草稿',typeWeb:'Web · 服务端保密客户端',typeSpa:'SPA · 浏览器公开客户端',typeNative:'Native · 原生公开客户端'
   },
   en: {
     secure:'Secure session',eyebrow:'DEVELOPER WORKSPACE',title:'Manage your identity applications',intro:'Maintain your developer profile, submit applications for review, and track their status.',
@@ -49,7 +49,7 @@ const t = {
     loadProfileError:'Could not load the developer profile.',groupError:'Application group operation failed.',requestError:'Operation failed.',
     confirmSubmit:'Submit this revision for review?',confirmRotate:'The current secret will stop working immediately. Continue?',
     appSaved:'Application draft saved.',profileMissing:'Register a developer name and contact email first.',copy:'Copy',
-    unknownError:'Request failed. Please try again later.'
+    unknownError:'Request failed. Please try again later.',verified:'Verified',unverified:'Unverified',draft:'Draft',typeWeb:'Web · confidential server client',typeSpa:'SPA · public browser client',typeNative:'Native · public native client'
   }
 };
 function tr(key){return t[state.language][key]??t.zh[key]??key}
@@ -114,16 +114,16 @@ async function refresh(){
   const [profile,apps,groups]=await Promise.all([
     request('/profile'),request('/applications?page=1&pageSize=100'),request('/groups?page=1&pageSize=100')
   ]);
-  state.apps=apps.list||[];state.groups=groups.list||[];
+  state.profile=profile;state.apps=apps.list||[];state.groups=groups.list||[];
   const profileState=document.querySelector('#profile-state');
   if(profile){
     state.profileRevision=profile.revision;
     document.querySelector('#profile-form [name=displayName]').value=profile.displayName;
     document.querySelector('#profile-form [name=contactEmail]').value=profile.contactEmail;
-    profileState.textContent=profile.contactEmailVerified?'已验证':'未验证';
+    profileState.textContent=profile.contactEmailVerified?tr('verified'):tr('unverified');
     profileState.className='pill '+(profile.contactEmailVerified?'pill-approved':'pill-muted');
   }else{
-    state.profileRevision=0;profileState.textContent=tr('profileRequired');profileState.className='pill pill-pending';
+    state.profile=null;state.profileRevision=0;profileState.textContent=tr('profileRequired');profileState.className='pill pill-pending';
   }
   renderApps();renderGroups();
 }
