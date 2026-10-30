@@ -6,9 +6,10 @@ import type Provider from 'oidc-provider';
 import type { ServiceConfig } from './config.js';
 
 export function createApplication(
-  _config: ServiceConfig,
+  config: ServiceConfig,
   provider?: Provider,
   interactions?: Router,
+  developer?: Router,
 ): Express {
   const app = express();
 
@@ -22,7 +23,7 @@ export function createApplication(
     response.setHeader('X-Frame-Options', 'DENY');
     response.setHeader('Referrer-Policy', 'no-referrer');
     response.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
-    if (_config.issuer.startsWith('https:')) {
+    if (config.issuer.startsWith('https:')) {
       response.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
     next();
@@ -36,6 +37,7 @@ export function createApplication(
   });
 
   if (interactions) app.use('/interaction', interactions);
+  if (developer) app.use('/api/v1/developer', developer);
   if (provider) app.use(provider.callback());
 
   app.use((_request, response) => {
