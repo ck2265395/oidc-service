@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 
+import nodemailer from 'nodemailer';
 import type { RedisClientType } from 'redis';
 
 import type { ApplicationService } from './platform.js';
@@ -87,30 +88,27 @@ export function createVerificationMailer(config: {
   user: string | null;
   password: string | null;
   from: string;
-}): (to: string, link: string) => Promise<void> {
-  // Loaded only when SMTP is enabled so deployments without a mail relay can still start.
-  return async (to, link) => {
-    const nodemailer = await import('nodemailer');
-    const transport = nodemailer.default.createTransport({
-      host: config.host,
-      port: config.port,
-      secure: config.secure,
-      requireTLS: !config.secure,
-      auth: config.user && config.password ? { user: config.user, pass: config.password } : undefined,
-      tls: { minVersion: 'TLSv1.2' },
-    });
-    try {
+}): { send: (to: string, link: string) => Promise<void>; close: () => void } {
+  const transport = nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    requireTLS: !config.secure,
+    auth: config.user && config.password ? { user: config.user, pass: config.password } : undefined,
+    tls: { minVersion: 'TLSv1.2' },
+  });
+  return {
+    send: async (to, link) => {
       await transport.sendMail({
         from: config.from,
         to,
         subject: 'Verify your DT Identity contact email',
-        text: 'Open this link to verify your DT Identity contact email. This link expires in 30 minutes:\n' + link,
+        text: 'Open this link to verify your DT Identity contact email. This link expires in 30 minutes:\\n' + link,
         html: '<p>Open this link to verify your DT Identity contact email. This link expires in 30 minutes:</p><p><a href="' +
           link.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!) +
           '">Verify contact email</a></p>',
       });
-    } finally {
-      transport.close();
-    }
+    },
+    close: () => transport.close(),
   };
 }
