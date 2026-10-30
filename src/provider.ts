@@ -4,6 +4,7 @@ import { AccountService, claimsForScopes } from './accounts.js';
 import type { ApplicationService } from './platform.js';
 
 const ACCOUNT_ID_SEPARATOR = '.';
+export const PORTAL_CLIENT_ID = 'dt-identity-portal';
 
 export function accountHandle(uuid: string, fingerprint: string): string {
   return uuid + ACCOUNT_ID_SEPARATOR + fingerprint;
@@ -28,6 +29,18 @@ export function createProvider(
 ): Provider {
   const provider = new Provider(issuer, {
     adapter,
+    clients: [{
+      client_id: PORTAL_CLIENT_ID,
+      client_name: 'DT Identity Portal',
+      client_uri: issuer,
+      redirect_uris: [issuer + '/portal/callback'],
+      response_types: ['code'],
+      grant_types: ['authorization_code'],
+      scope: 'openid profile email',
+      token_endpoint_auth_method: 'none',
+      application_type: 'web',
+      id_token_signed_response_alg: 'RS256',
+    }],
     jwks: signingKeys,
     scopes: ['openid', 'profile', 'email'],
     findAccount: async (ctx, accountId) => {
@@ -35,9 +48,9 @@ export function createProvider(
       const clientId = ctx.oidc.client?.clientId;
       if (!handle || !clientId) return undefined;
 
-      const active = await applications.activeClient(clientId);
-      if (!active) return undefined;
-      const sector = active.config.groupId ?? clientId;
+      const active = clientId === PORTAL_CLIENT_ID ? null : await applications.activeClient(clientId);
+      if (clientId !== PORTAL_CLIENT_ID && !active) return undefined;
+      const sector = active?.config.groupId ?? clientId;
       const identity = await accounts.resolve(handle.uuid, handle.fingerprint, sector);
       if (!identity) return undefined;
 
