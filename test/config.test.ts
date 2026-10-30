@@ -1,21 +1,24 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import test from 'node:test';
 
 import { ConfigError, loadConfig } from '../src/config.js';
+
+const testSecret = () => randomBytes(32).toString('base64url');
 
 const validConfig = () => ({
   mode: 'test',
   issuer: 'https://identity.example.test',
   port: 3000,
   secrets: {
-    cookie: 'c'.repeat(48),
-    fingerprint: 'f'.repeat(48),
-    subject: 's'.repeat(48),
-    encryption: 'e'.repeat(48),
+    cookie: testSecret(),
+    fingerprint: testSecret(),
+    subject: testSecret(),
+    encryption: testSecret(),
   },
   admin: {
     username: 'ops',
-    passwordHash: 'scrypt$16384$8$1$salt$hash',
+    passwordHash: 'scrypt$16384$8$1$c2FsdA$aGFzaA',
   },
   databases: {
     oidc: 'postgres://oidc:secret@localhost:5432/oidc_test',
@@ -43,6 +46,20 @@ test('rejects weak or placeholder secrets', () => {
   input.secrets.cookie = 'replace-me';
 
   assert.throws(() => loadConfig(input), /secrets\.cookie/);
+});
+
+test('rejects long but low-diversity secrets', () => {
+  const input = validConfig();
+  input.secrets.cookie = 'A'.repeat(48);
+
+  assert.throws(() => loadConfig(input), /secrets\.cookie/);
+});
+
+test('requires independent cryptographic keys', () => {
+  const input = validConfig();
+  input.secrets.fingerprint = input.secrets.cookie;
+
+  assert.throws(() => loadConfig(input), /independent/);
 });
 
 test('requires HTTPS issuer in production', () => {
