@@ -13,7 +13,7 @@
 
 包含只读账号认证、OIDC 登录和授权同意交互、用户授权撤销页、开发者 API 与 `/developer` 双语界面、AES-GCM 加密的 Web 客户端密钥生成与轮换，以及独立管理员应用/应用组审核页面、操作审计和状态统计。开发者界面支持开发者资料、应用草稿、审核提交、应用组管理和密钥轮换；未登录时可从页面直接进入门户登录。已批准的 SPA/native 客户端使用公开客户端认证。
 
-服务首页 `/`、开发者中心 `/developer` 与门户授权页 `/portal/authorizations` 已提供；门户使用 OIDC Authorization Code + PKCE 登录。联系邮箱验证、跨实例缓存失效的实环境验收、真实数据库端到端验证、Web/native 示例已提供；生产级升级迁移和目标环境端到端验收仍待完成。Web 客户端示例见 [examples/web-client](examples/web-client)，Native 客户端示例见 [examples/native](examples/native)。API 路由见 [docs/api.md](docs/api.md)，部署步骤见 [docs/deploy.md](docs/deploy.md)，实施限制见 [docs/progress.md](docs/progress.md)。
+服务首页 `/`、开发者中心 `/developer` 与门户授权页 `/portal/authorizations` 已提供；门户使用 OIDC Authorization Code + PKCE 登录。可运行的 Web 客户端示例见 [examples/web-client](examples/web-client)，Native 客户端示例见 [examples/native](examples/native)。GitHub Actions 使用临时 PostgreSQL 17 与 Redis 7 执行存储集成检查。联系邮箱验证、真实账号库和目标网络端到端验收、生产级升级迁移及目标环境综合验收仍待完成。API 路由见 [docs/api.md](docs/api.md)，部署步骤见 [docs/deploy.md](docs/deploy.md)，实施限制见 [docs/progress.md](docs/progress.md)。
 
 ## 检查
 
@@ -25,7 +25,7 @@ npm test
 npm run build
 ```
 
-GitHub Actions 在每次分支更新时自动运行上述检查。
+GitHub Actions 在每次分支更新时运行类型检查、Lint、前端和 Web 示例语法检查、单元/HTTP 测试、临时 PostgreSQL/Redis 存储集成测试与构建。
 
 ## 运行准备
 
