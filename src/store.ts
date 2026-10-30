@@ -397,6 +397,32 @@ export class PostgresApplicationRepository implements ApplicationRepository, App
     }
   }
 
+  async renameGroup(previous: ApplicationGroupRecord, next: ApplicationGroupRecord): Promise<boolean> {
+    const connection = await this.pool.connect();
+    try {
+      await connection.query('BEGIN');
+      const update = await connection.query(
+        "UPDATE application_group SET display_name = $1, status = 'pending', revision = $2, last_review = NULL, updated_at = now() WHERE id = $3 AND owner_account_uuid = $4 AND revision = $5 AND status IN ('pending', 'rejected')",
+        [next.displayName, next.revision, previous.id, previous.ownerUuid, previous.revision],
+      );
+      if (update.rowCount !== 1) {
+        await connection.query('ROLLBACK');
+        return false;
+      }
+      await connection.query(
+        "INSERT INTO platform_audit (actor_type, actor_id, action, outcome, details, created_at) VALUES ('account', $1, 'application_group.rename', 'success', $2::jsonb, now())",
+        [previous.ownerUuid, JSON.stringify({ groupId: next.id, revision: next.revision, status: next.status })],
+      );
+      await connection.query('COMMIT');
+      return true;
+    } catch {
+      await this.rollbackQuietly(connection);
+      throw new PlatformStorageError();
+    } finally {
+      connection.release();
+    }
+  }
+
   async getGroup(id: string): Promise<ApplicationGroupRecord | null> {
     try {
       const result = await this.pool.query<GroupRow>(
