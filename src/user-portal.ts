@@ -201,7 +201,7 @@ export function createUserPortalRouter(
       if (!session) return error(response, 401, '登录状态已失效，请重新开始。');
       const fingerprint = session.accountId.slice(session.accountId.lastIndexOf('.') + 1);
       const identity = await accounts.resolve(session.uuid, fingerprint, PORTAL_CLIENT_ID);
-      if (!identity || verified.payload.sub !== identity.sub) {
+      if (!identity || verified.payload.sub !== identity.sub || scalar(verified.payload.nonce) !== loginState.nonce) {
         return error(response, 401, '身份验证未通过，请重新开始。');
       }
       response.redirect(303, safeReturnPath(loginState.returnTo));
