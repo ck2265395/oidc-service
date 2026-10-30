@@ -12,6 +12,7 @@ const secure = appOrigin.startsWith('https:');
 const cookieName = secure ? '__Host-oidc-demo' : 'oidc-demo';
 const pending = new Map();
 const sessions = new Map();
+const logoutStates = new Map();
 let metadata;
 let jwks;
 
@@ -110,7 +111,7 @@ async function handle(request, response) {
       throw new Error('ID token nonce or subject is invalid');
     }
     const id = randomValue();
-    sessions.set(id, { claims: verified.payload, expiresAt: Date.now() + 3600000 });
+    sessions.set(id, { claims: verified.payload, idToken: tokens.id_token, expiresAt: Date.now() + 3600000 });
     setSessionCookie(response, id, 3600);
     response.writeHead(303, { Location: '/' }).end();
     return;
@@ -146,5 +147,6 @@ createServer((request, response) => {
     response.end(page('Temporarily unavailable', '<p>Check the server configuration and retry.</p>'));
   });
 }).listen(port, '0.0.0.0', () => {
-  process.stdout.write('DT Identity Web Client listening on port ' + port + '\n');
+  process.stdout.write('DT Identity Web Client listening on port ' + port + '
+');
 });
