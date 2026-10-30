@@ -230,8 +230,9 @@ export function safeProfilePictureUrl(value: string | null, baseUrl: string | nu
     if (absolute.protocol !== 'https:' || !absolute.hostname || absolute.username || absolute.password) return null;
     return absolute.toString();
   } catch {
-    if (!baseUrl || value.startsWith('//') || /[?#\\\\]/.test(value)) return null;
-    const path = value.replace(/^\\/+/, '');
+    if (!baseUrl || value.startsWith('//') || value.includes(String.fromCharCode(92)) || value.includes('?') || value.includes('#')) return null;
+    let path = value;
+    while (path.startsWith('/')) path = path.slice(1);
     if (!path || path.split('/').some((part) => part === '.' || part === '..')) return null;
     try {
       const base = new URL(baseUrl.endsWith('/') ? baseUrl : baseUrl + '/');
