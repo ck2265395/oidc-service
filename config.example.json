@@ -25,5 +25,6 @@
     "ipAttempts": 100
   },
   "smtp": null,
-  "accountPortal": null
+  "accountPortal": null,
+  "profilePictureBaseUrl": null
 }
