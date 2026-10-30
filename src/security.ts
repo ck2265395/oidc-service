@@ -89,7 +89,8 @@ export function hashScryptPassword(password: string): string {
   if (typeof password !== 'string' || password.length < 12 || password.length > 1024) {
     throw new TypeError('Password must contain between 12 and 1024 characters');
   }
-  const salt = randomBytes(16).toString('base64url');
+  const salt = randomBytes(16);
+  const saltValue = salt.toString('base64url');
   const derived = scryptSync(password, salt, SCRYPT_KEY_BYTES, {
     N: SCRYPT_N,
     r: SCRYPT_R,
@@ -97,7 +98,7 @@ export function hashScryptPassword(password: string): string {
     maxmem: 64 * 1024 * 1024,
   }).toString('base64url');
 
-  return `scrypt$${SCRYPT_N}$${SCRYPT_R}$${SCRYPT_P}$${salt}$${derived}`;
+  return `scrypt${SCRYPT_N}${SCRYPT_R}${SCRYPT_P}${saltValue}${derived}`;
 }
 
 export function verifyScryptPassword(password: string, encodedHash: string): boolean {
@@ -119,8 +120,7 @@ export function verifyScryptPassword(password: string, encodedHash: string): boo
     n > 65_536 ||
     (n & (n - 1)) !== 0 ||
     !Number.isSafeInteger(r) ||
-    r < 8 ||
-    r > 8 ||
+    r !== 8 ||
     !Number.isSafeInteger(p) ||
     p < 1 ||
     p > 4 ||
