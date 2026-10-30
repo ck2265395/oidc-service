@@ -61,10 +61,11 @@ test('PostgreSQL repositories and Redis security controls work across connection
 
     await applications.submit(created.id, ownerUuid, created.revision);
     await applications.review(created.id, created.revision, { action: 'approve', reviewerUuid });
-    assert.equal(await applications.activeClient(created.clientId), null);
+    assert.equal((await applications.activeClient(created.clientId))?.config.groupId, null);
 
     await groups.review(groupId, group.revision, { action: 'approve', reviewerUuid });
     assert.equal((await applications.activeClient(created.clientId))?.config.name, draft.name);
+    assert.equal((await applications.activeClient(created.clientId))?.config.groupId, groupId);
     assert.equal((await repository.listForAdmin?.(1, 10, 'approved'))?.total, 1);
 
     const key = randomBytesForTest();
