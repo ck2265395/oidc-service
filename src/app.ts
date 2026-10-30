@@ -6,7 +6,16 @@ import type Provider from 'oidc-provider';
 
 import type { ServiceConfig } from './config.js';
 
-export interface ProtocolAuditEvent {\n  requestId: string;\n  endpoint: string;\n  outcome: 'success' | 'denied' | 'failure';\n  status: number;\n  durationMs: number;\n  clientId: string | null;\n}\n\nexport function createApplication(
+export interface ProtocolAuditEvent {
+  requestId: string;
+  endpoint: string;
+  outcome: 'success' | 'denied' | 'failure';
+  status: number;
+  durationMs: number;
+  clientId: string | null;
+}
+
+export function createApplication(
   config: ServiceConfig,
   provider?: Provider,
   interactions?: Router,
@@ -79,14 +88,14 @@ export interface ProtocolAuditEvent {\n  requestId: string;\n  endpoint: string;
         if (!endpoint) return next();
         const startedAt = Date.now();
         const requestId = String(response.locals.requestId);
-        const queryClient = typeof request.query.client_id === 'string' ? request.query.client_id : null;
+        const queryClient = typeof request.query.client_id === 'string' && request.query.client_id.length <= 255 ? request.query.client_id : null;
         const authorization = request.header('authorization') ?? '';
         let basicClient: string | null = null;
         if (/^Basic\s/i.test(authorization)) {
           try {
             const decoded = Buffer.from(authorization.slice(6), 'base64').toString('utf8');
             const separator = decoded.indexOf(':');
-            if (separator > 0) basicClient = decoded.slice(0, separator);
+            if (separator > 0 && separator <= 255) basicClient = decoded.slice(0, separator);
           } catch {
             basicClient = null;
           }
@@ -102,7 +111,7 @@ export interface ProtocolAuditEvent {\n  requestId: string;\n  endpoint: string;
             durationMs: Math.max(0, Date.now() - startedAt),
             clientId: queryClient ?? basicClient,
           }).catch(() => {
-            process.stderr.write(JSON.stringify({ event: 'protocol_audit_write_failed', requestId, endpoint }) + '\\n');
+            process.stderr.write(JSON.stringify({ event: 'protocol_audit_write_failed', requestId, endpoint }) + '\n');
           });
         });
         next();
