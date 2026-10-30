@@ -193,6 +193,24 @@ export function createDeveloperRouter(
     }
   });
 
+  router.delete('/groups/:id', async (request, response) => {
+    if (!ensureWriteRequest(request, response)) return;
+    const ownerUuid = await authenticatedOwner(request, response);
+    if (!ownerUuid) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
+    const revision = body(request).expectedRevision;
+    if (!Number.isSafeInteger(revision) || Number(revision) < 1) {
+      return jsonError(response, 400, 'invalid_revision', 'A group revision is required');
+    }
+    try {
+      const deleted = await groups.delete(request.params.id, ownerUuid, Number(revision));
+      if (!deleted) return jsonError(response, 404, 'not_found', 'Application group was not found');
+      response.json({ code: 0, desc: 'ok', data: { deleted: true } });
+    } catch (error) {
+      if (error instanceof ApplicationGroupError) return jsonError(response, 409, 'group_conflict', error.message);
+      jsonError(response, 503, 'storage_unavailable', 'Application group data is unavailable');
+    }
+  });
+
   router.put('/groups/:id', async (request, response) => {
     if (!ensureWriteRequest(request, response)) return;
     const ownerUuid = await authenticatedOwner(request, response);
