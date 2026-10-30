@@ -29,7 +29,7 @@ jobs:
         run: npm run lint
       - name: Frontend JavaScript syntax
         run: node --check public/developer.js
-      - name: Unit and HTTP tests
+      - name: Web example JavaScript syntax\n        run: node --check examples/web-client/server.js\n      - name: Unit and HTTP tests
         run: npm test
       - name: Build
         run: npm run build
