@@ -34,6 +34,7 @@ services:
     environment:
       OIDC_CONFIG_FILE: /run/identity/config.json
       OIDC_SIGNING_KEY_FILE: /run/identity/signing.json
+    command: ["sh", "-c", "npm run migrate && npm start"]
     ports:
       - "3000:3000"
     volumes:
