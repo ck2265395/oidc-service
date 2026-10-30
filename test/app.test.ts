@@ -61,3 +61,21 @@ test('unknown routes do not reveal internal error details', async (context) => {
   assert.deepEqual(Object.keys(body).sort(), ['error', 'requestId']);
   assert.equal(body.error, 'not_found');
 });
+test('readiness endpoint checks dependencies and fails closed on dependency errors', async (context) => {
+  const unavailable = createServer(createApplication(config, undefined, undefined, undefined, undefined, undefined, async () => {
+    throw new Error('dependency unavailable');
+  }));
+  await new Promise<void>((resolve) => unavailable.listen(0, '127.0.0.1', resolve));
+  context.after(() => new Promise<void>((resolve, reject) => {
+    unavailable.close((error) => error ? reject(error) : resolve());
+  }));
+
+  const address = unavailable.address();
+  assert.ok(address && typeof address !== 'string');
+  const response = await fetch(`http://127.0.0.1:${address.port}/health/ready`);
+  const body = await response.json() as { status: string; requestId: string };
+
+  assert.equal(response.status, 503);
+  assert.equal(body.status, 'unavailable');
+  assert.equal(response.headers.get('x-request-id'), body.requestId);
+});
