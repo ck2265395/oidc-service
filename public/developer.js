@@ -61,7 +61,7 @@ function setLanguage(language){
   document.querySelector('#language-toggle').textContent=language==='zh'?'EN':'中文';
   document.querySelector('#sign-in-link').textContent=tr('signIn');
 }
-function notice(message,kind='success'){
+function showSignInEntry(){document.querySelector('#sign-in-link').hidden=false;document.querySelector('#secure-label').hidden=true}\nfunction notice(message,kind='success'){
   const el=document.querySelector('#notice');el.textContent=message;el.className='notice notice-'+kind;el.hidden=false;
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -75,7 +75,7 @@ async function request(path,options={}){
     ...options.headers
   }});
   const result=await response.json().catch(()=>null);
-  if(response.status===401)throw new Error('AUTH_REQUIRED');
+  if(response.status===401){showSignInEntry();throw new Error('AUTH_REQUIRED')}
   if(!response.ok||!result||result.code!==0)throw new Error(result?.desc||tr('unknownError'));
   return result.data;
 }
