@@ -24,6 +24,7 @@ export function createApplication(
   userPortal?: Router,
   readiness?: () => Promise<void>,
   recordProtocolEvent?: (event: ProtocolAuditEvent) => Promise<void>,
+  userApi?: Router,
 ): Express {
   const app = express();
   const publicDirectory = resolve(process.cwd(), 'public');
@@ -76,6 +77,7 @@ export function createApplication(
   });
 
   if (interactions) app.use('/interaction', interactions);
+  if (userApi) app.use('/api/v1/me', userApi);
   if (developer) app.use('/api/v1/developer', developer);
   if (admin) app.use('/admin', admin);
   if (userPortal) app.use('/portal', userPortal);
