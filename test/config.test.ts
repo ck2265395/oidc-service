@@ -35,6 +35,7 @@ test('accepts a complete test configuration', () => {
   assert.equal(config.mode, 'test');
   assert.equal(config.port, 3000);
   assert.equal(config.issuer, 'https://identity.example.test');
+  assert.deepEqual(config.loginRateLimit, { windowSeconds: 900, accountAttempts: 10, ipAttempts: 100 });
 });
 
 test('rejects non-object and array configuration values', () => {
@@ -111,5 +112,20 @@ test('rejects malformed or overly broad proxy configuration entries', () => {
     const input = validConfig();
     input.trustedProxyCidrs = [entry];
     assert.throws(() => loadConfig(input), /trustedProxyCidrs/);
+  }
+});
+
+test('accepts bounded configurable login rate limits', () => {
+  const input = { ...validConfig(), loginRateLimit: { windowSeconds: 600, accountAttempts: 8, ipAttempts: 80 } };
+  assert.deepEqual(loadConfig(input).loginRateLimit, input.loginRateLimit);
+});
+
+test('rejects invalid login rate limit values', () => {
+  for (const loginRateLimit of [
+    { windowSeconds: 10, accountAttempts: 10, ipAttempts: 100 },
+    { windowSeconds: 900, accountAttempts: 0, ipAttempts: 100 },
+    { windowSeconds: 900, accountAttempts: 10, ipAttempts: 10001 },
+  ]) {
+    assert.throws(() => loadConfig({ ...validConfig(), loginRateLimit }), /loginRateLimit/);
   }
 });
