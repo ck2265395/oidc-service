@@ -35,6 +35,7 @@ export interface ApplicationRepository {
     contactEmail: string,
     expectedRevision: number,
   ): Promise<DeveloperProfileRecord | null>;
+  verifyDeveloperEmail?(accountUuid: string, contactEmail: string): Promise<boolean>;
   createApplication(record: ApplicationRecord, encryptedClientSecret?: string | null): Promise<void>;
   getEncryptedClientSecret?(clientId: string): Promise<string | null>;
   rotateEncryptedClientSecret?(
@@ -265,6 +266,18 @@ export class PostgresApplicationRepository implements ApplicationRepository, App
         contactEmailVerified: row.contact_email_verified,
         revision: Number(row.revision),
       } : null;
+    } catch {
+      throw new PlatformStorageError();
+    }
+  }
+
+  async verifyDeveloperEmail(accountUuid: string, contactEmail: string): Promise<boolean> {
+    try {
+      const result = await this.pool.query(
+        'UPDATE developer_profile SET contact_email_verified = true, updated_at = now() WHERE account_uuid = $1 AND contact_email = $2 AND contact_email_verified = false',
+        [accountUuid, contactEmail],
+      );
+      return result.rowCount === 1;
     } catch {
       throw new PlatformStorageError();
     }
