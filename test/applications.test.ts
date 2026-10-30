@@ -95,3 +95,9 @@ test('rejects unsupported scopes and requires openid', () => {
     ApplicationValidationError,
   );
 });
+test('application groups require stable UUID identifiers', () => {
+  assert.throws(
+    () => validateApplicationDraft(draft({ groupId: 'guessable-group-name' }), 'web', 'production'),
+    ApplicationValidationError,
+  );
+});
