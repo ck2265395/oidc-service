@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS developer_profile (
   contact_email text NOT NULL CHECK (char_length(contact_email) <= 254),
   contact_email_verified boolean NOT NULL DEFAULT false,
   revision bigint NOT NULL DEFAULT 1 CHECK (revision > 0),
+  last_review jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -20,6 +21,22 @@ CREATE TABLE IF NOT EXISTS application_group (
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (owner_account_uuid, display_name)
 );
+
+ALTER TABLE application_group ADD COLUMN IF NOT EXISTS last_review jsonb;
+
+CREATE TABLE IF NOT EXISTS application_group_review_history (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  group_id uuid NOT NULL REFERENCES application_group(id),
+  owner_account_uuid text NOT NULL,
+  reviewer_uuid text NOT NULL,
+  decision text NOT NULL CHECK (decision IN ('approve', 'reject', 'disable')),
+  reason text,
+  revision bigint NOT NULL CHECK (revision > 0),
+  created_at timestamptz NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS application_group_review_history_group_created_idx
+  ON application_group_review_history (group_id, created_at DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS oidc_application (
   id uuid PRIMARY KEY,
