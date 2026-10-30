@@ -103,7 +103,7 @@ export function createVerificationMailer(config: {
         from: config.from,
         to,
         subject: 'Verify your DT Identity contact email',
-        text: 'Open this link to verify your DT Identity contact email. This link expires in 30 minutes:\\n' + link,
+        text: 'Open this link to verify your DT Identity contact email. This link expires in 30 minutes:\n' + link,
         html: '<p>Open this link to verify your DT Identity contact email. This link expires in 30 minutes:</p><p><a href="' +
           link.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!) +
           '">Verify contact email</a></p>',
