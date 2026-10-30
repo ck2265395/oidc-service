@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
 import express, { type ErrorRequestHandler, type Express } from 'express';
+import type Provider from 'oidc-provider';
 
 import type { ServiceConfig } from './config.js';
 
-export function createApplication(_config: ServiceConfig): Express {
+export function createApplication(_config: ServiceConfig, provider?: Provider): Express {
   const app = express();
 
   app.disable('x-powered-by');
@@ -23,6 +24,10 @@ export function createApplication(_config: ServiceConfig): Express {
     });
   });
 
+  if (provider) {
+    app.use(provider.callback());
+  }
+
   app.use((_request, response) => {
     response.status(404).json({
       error: 'not_found',
@@ -31,7 +36,6 @@ export function createApplication(_config: ServiceConfig): Express {
   });
 
   const errors: ErrorRequestHandler = (_error: unknown, _request, response, _next) => {
-    // Never send error details or request data to the client.
     response.status(500).json({
       error: 'internal_error',
       requestId: response.locals.requestId,
