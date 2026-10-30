@@ -175,11 +175,12 @@ export function createInteractionRouter(
       if (!clientId) return errorPage(response);
       const active = await applications.activeClient(clientId);
       if (!active) return errorPage(response);
-      await rateLimiter.consume(type, identifier, request.ip || request.socket.remoteAddress || 'unknown');
+      const sourceAddress = request.ip || request.socket.remoteAddress || 'unknown';
       const identity = await accounts.authenticate(
         { type, value: identifier },
         password,
         active.config.groupId ?? clientId,
+        (accountUuid) => rateLimiter.consume(accountUuid, type, identifier, sourceAddress),
       );
       if (!identity) return response.status(401).type('html').send(
         page('登录失败', '<p>登录信息不正确或账号当前不可用。</p><p><a href="/interaction/' +
