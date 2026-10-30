@@ -58,7 +58,7 @@ function setLanguage(language){
   document.documentElement.lang=language==='zh'?'zh-CN':'en';
   document.querySelectorAll('[data-i18n]').forEach(el=>{const value=tr(el.dataset.i18n);if(typeof value==='string')el.textContent=value});
   document.querySelectorAll('[data-placeholder]').forEach(el=>el.placeholder=tr(el.dataset.placeholder));
-  document.querySelector('#language-toggle').textContent=language==='zh'?'EN':'中文';
+  document.querySelector('#language-toggle').textContent=language==='zh'?'EN':'中文';\n  document.querySelector('#sign-in-link').textContent=tr('signIn');
 }
 function notice(message,kind='success'){
   const el=document.querySelector('#notice');el.textContent=message;el.className='notice notice-'+kind;el.hidden=false;
@@ -83,7 +83,7 @@ async function loadCsrf(){
   if(response.status===401)throw new Error('AUTH_REQUIRED');
   const result=await response.json();
   if(!response.ok||result.code!==0||!result.data?.token)throw new Error(result.desc||tr('unknownError'));
-  state.csrf=result.data.token;
+  state.csrf=result.data.token;\n  document.querySelector('#sign-in-link').hidden=true;document.querySelector('#secure-label').hidden=false;
 }
 function statusClass(status){return ['pending','approved','rejected','disabled'].includes(status)?'pill-'+status:'pill-muted'}
 function statusName(status){
@@ -244,7 +244,7 @@ document.querySelector('#copy-secret').addEventListener('click',async()=>{
   try{await navigator.clipboard.writeText(secret);notice(tr('copied'))}catch{notice(tr('copyFailed'),'error')}
 });
 setLanguage('zh');
-loadCsrf().then(refresh).catch(error=>{
+loadCsrf().then(refresh).catch(error=>{\n  if(error.message==='AUTH_REQUIRED'){document.querySelector('#sign-in-link').hidden=false;document.querySelector('#secure-label').hidden=true}
   document.querySelector('#profile-state').textContent=error.message==='AUTH_REQUIRED'?tr('authRequired'):tr('loadFailed');
   document.querySelector('#application-list').innerHTML='<div class="empty-state">'+escapeHtml(error.message==='AUTH_REQUIRED'?tr('authRequired'):tr('loadFailed'))+'</div>';
   document.querySelector('#group-list').innerHTML='';
