@@ -34,6 +34,10 @@ export function createApplication(
   });
 
   app.use('/assets', express.static(publicDirectory, { index: false, fallthrough: false, maxAge: '1h' }));
+  app.get('/', (_request, response) => {
+    response.sendFile(resolve(publicDirectory, 'index.html'));
+  });
+
   app.get('/developer', (_request, response) => {
     response.sendFile(resolve(publicDirectory, 'developer.html'));
   });
