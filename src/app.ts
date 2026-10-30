@@ -83,7 +83,7 @@ export function createApplication(
     if (recordProtocolEvent) {
       app.use((request, response, next) => {
         const pathname = request.path;
-        const endpoints = ['/authorize', '/token', '/userinfo', '/revoke', '/session/end'];
+        const endpoints = ['/authorize', '/auth', '/token', '/userinfo', '/me', '/revoke', '/session/end'];
         const endpoint = endpoints.find((candidate) => pathname === candidate || pathname.startsWith(candidate + '/'));
         if (!endpoint) return next();
         const startedAt = Date.now();
@@ -102,7 +102,14 @@ export function createApplication(
         }
         response.once('finish', () => {
           const status = response.statusCode;
-          const outcome = status >= 500 ? 'failure' : status >= 400 ? 'denied' : 'success';
+          const location = String(response.getHeader('location') ?? '');
+          let deniedRedirect = false;
+          try {
+            deniedRedirect = new URL(location, 'http://local.invalid').searchParams.has('error');
+          } catch {
+            deniedRedirect = false;
+          }
+          const outcome = status >= 500 ? 'failure' : status >= 400 || deniedRedirect ? 'denied' : 'success';
           void recordProtocolEvent({
             requestId,
             endpoint,
