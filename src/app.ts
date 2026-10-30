@@ -1,11 +1,15 @@
 import { randomUUID } from 'node:crypto';
 
-import express, { type ErrorRequestHandler, type Express } from 'express';
+import express, { type ErrorRequestHandler, type Express, type Router } from 'express';
 import type Provider from 'oidc-provider';
 
 import type { ServiceConfig } from './config.js';
 
-export function createApplication(_config: ServiceConfig, provider?: Provider): Express {
+export function createApplication(
+  _config: ServiceConfig,
+  provider?: Provider,
+  interactions?: Router,
+): Express {
   const app = express();
 
   app.disable('x-powered-by');
@@ -24,9 +28,8 @@ export function createApplication(_config: ServiceConfig, provider?: Provider): 
     });
   });
 
-  if (provider) {
-    app.use(provider.callback());
-  }
+  if (interactions) app.use('/interaction', interactions);
+  if (provider) app.use(provider.callback());
 
   app.use((_request, response) => {
     response.status(404).json({
