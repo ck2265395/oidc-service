@@ -199,7 +199,7 @@ export function createInteractionRouter(
       const scopes = requestedScopes(details.params.scope, active.config.scopes);
       if (!scopes) return errorPage(response);
       const grant = new provider.Grant({ accountId, clientId });
-      grant.addOIDCScopes(scopes.join(' '));
+      grant.addOIDCScope(scopes);
       const grantId = await grant.save();
       await provider.interactionFinished(request, response, { consent: { grantId } });
     } catch {
