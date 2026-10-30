@@ -1,4 +1,4 @@
-import { Provider, type AdapterFactory, type JWKS } from 'oidc-provider';
+import { Provider, type AdapterFactory, type Configuration, type JWKS } from 'oidc-provider';
 
 import { AccountService, claimsForScopes } from './accounts.js';
 import type { ApplicationService } from './platform.js';
@@ -51,9 +51,10 @@ export function createProvider(
     interactions: {
       url: (_ctx, interaction) => `/interaction/${interaction.uid}`,
     },
-    pkce: {
+    pkce: ({
       required: () => true,
-    },
+      methods: ['S256'],
+    } as unknown as NonNullable<Configuration['pkce']>),
     features: {
       devInteractions: { enabled: false },
       clientCredentials: { enabled: false },
@@ -61,7 +62,6 @@ export function createProvider(
       registration: { enabled: false },
       registrationManagement: { enabled: false },
       revocation: { enabled: true },
-      pkce: { enabled: true, supportedMethods: ['S256'] },
     },
     cookies: {
       keys: [cookieKey],
