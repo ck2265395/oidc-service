@@ -415,8 +415,14 @@ export class PostgresApplicationRepository implements ApplicationRepository, App
       );
       await connection.query('COMMIT');
       return true;
-    } catch {
+    } catch (error) {
       await this.rollbackQuietly(connection);
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: unknown }).code === '23505'
+      ) return false;
       throw new PlatformStorageError();
     } finally {
       connection.release();
