@@ -18,7 +18,7 @@
 ## 检查
 
 ```sh
-npm ci
+npm install
 npm run check
 npm run lint
 npm test
