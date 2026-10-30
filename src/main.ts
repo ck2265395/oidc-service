@@ -80,7 +80,13 @@ export async function start(): Promise<void> {
 
   try {
     await Promise.all([oidcPool.query('SELECT 1'), accountPool.query('SELECT 1'), redisClient.connect()]);
-    const loginRateLimiter = new RedisLoginRateLimiter(redisClient, config.secrets.fingerprint);
+    const loginRateLimiter = new RedisLoginRateLimiter(
+      redisClient,
+      config.secrets.fingerprint,
+      config.loginRateLimit.windowSeconds,
+      config.loginRateLimit.accountAttempts,
+      config.loginRateLimit.ipAttempts,
+    );
     const provider = createProvider(
       config.issuer,
       createOidcAdapterFactory(oidcPool, applications),
