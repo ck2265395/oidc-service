@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { validateApplicationDraft, type ApplicationDraft, type ClientType, type RuntimeEnvironment } from './applications.js';
-import { randomToken } from './security.js';
+import { decryptSecret, encryptSecret, randomToken } from './security.js';
 import type { ApplicationRepository, ApplicationPage } from './store.js';
 
 export type ApplicationStatus = 'draft' | 'pending' | 'rejected' | 'approved' | 'disabled';
@@ -172,10 +172,31 @@ export class ApplicationService {
     private readonly environment: RuntimeEnvironment,
     private readonly makeId: () => string = randomUUID,
     private readonly makeClientId: () => string = () => randomToken(32),
+    private readonly encryptionKey?: string,
+    private readonly makeClientSecret: () => string = () => randomToken(48),
   ) {}
 
+  private clearClientCache: (clientId: string) => void = () => {};
+
+  setClientCacheClearer(clear: (clientId: string) => void): void {
+    this.clearClientCache = clear;
+  }
+
   async create(ownerUuid: string, type: ClientType, input: unknown): Promise<ApplicationRecord> {
+    const created = await this.createWithSecret(ownerUuid, type, input);
+    return created.record;
+  }
+
+  async createWithSecret(
+    ownerUuid: string,
+    type: ClientType,
+    input: unknown,
+  ): Promise<{ record: ApplicationRecord; clientSecret: string | null }> {
     if (!ownerUuid || ownerUuid.length > 255) throw new ApplicationConflictError();
+    if (type === 'web' && !this.encryptionKey) {
+      throw new ApplicationConflictError('Confidential client secret storage is not configured');
+    }
+
     const draft = validateApplicationDraft(input, type, this.environment);
     await this.assertGroupOwner(ownerUuid, draft.groupId);
 
@@ -186,8 +207,54 @@ export class ApplicationService {
       type,
       draft,
     });
-    await this.repository.createApplication(record);
-    return record;
+    const clientSecret = type === 'web' ? this.makeClientSecret() : null;
+    const encryptedClientSecret = clientSecret && this.encryptionKey
+      ? encryptSecret(clientSecret, this.encryptionKey)
+      : null;
+    await this.repository.createApplication(record, encryptedClientSecret);
+    return { record, clientSecret };
+  }
+
+  async getClientSecret(clientId: string): Promise<string | null> {
+    if (!this.encryptionKey) return null;
+    const active = await this.activeClient(clientId);
+    if (!active || active.record.type !== 'web' || !this.repository.getEncryptedClientSecret) return null;
+    const envelope = await this.repository.getEncryptedClientSecret(clientId);
+    if (!envelope) return null;
+    return decryptSecret(envelope, this.encryptionKey);
+  }
+
+  async rotateClientSecret(
+    id: string,
+    ownerUuid: string,
+    expectedRevision: number,
+  ): Promise<{ clientSecret: string } | null> {
+    if (!this.encryptionKey || !this.repository.getEncryptedClientSecret || !this.repository.rotateEncryptedClientSecret) {
+      throw new ApplicationConflictError('Confidential client secret storage is unavailable');
+    }
+    const current = await this.repository.getOwnedApplication(id, ownerUuid);
+    if (!current) return null;
+    if (current.type !== 'web' || current.status !== 'approved') {
+      throw new ApplicationConflictError('Only an approved confidential client can rotate its secret');
+    }
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== current.revision) {
+      throw new ApplicationConflictError();
+    }
+    const previousEnvelope = await this.repository.getEncryptedClientSecret(current.clientId);
+    if (!previousEnvelope) throw new ApplicationConflictError('Client secret is unavailable');
+
+    const clientSecret = this.makeClientSecret();
+    const nextEnvelope = encryptSecret(clientSecret, this.encryptionKey);
+    const updated = await this.repository.rotateEncryptedClientSecret(
+      current.clientId,
+      ownerUuid,
+      expectedRevision,
+      previousEnvelope,
+      nextEnvelope,
+    );
+    if (!updated) throw new ApplicationConflictError();
+    this.clearClientCache(current.clientId);
+    return { clientSecret };
   }
 
   async getOwned(id: string, ownerUuid: string): Promise<ApplicationRecord | null> {
@@ -237,6 +304,7 @@ export class ApplicationService {
     const next = reviewApplication(current, expectedRevision, command);
     const saved = await this.repository.compareAndSwap(current, next, next.lastReview);
     if (!saved) throw new ApplicationConflictError();
+    this.clearClientCache(current.clientId);
     return next;
   }
 
