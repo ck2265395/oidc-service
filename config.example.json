@@ -23,5 +23,6 @@
     "windowSeconds": 900,
     "accountAttempts": 10,
     "ipAttempts": 100
-  }
+  },
+  "smtp": null
 }
