@@ -68,6 +68,10 @@ export class ApplicationGroupService {
     return record;
   }
 
+  async getForAdmin(id: string): Promise<ApplicationGroupRecord | null> {
+    return this.repository.getGroup(id);
+  }
+
   async getOwned(id: string, ownerUuid: string): Promise<ApplicationGroupRecord | null> {
     return this.repository.getOwnedGroup(id, ownerUuid);
   }
