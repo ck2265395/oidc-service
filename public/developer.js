@@ -4,7 +4,7 @@ const t = {
   zh: {
     secure:'安全会话',signIn:'登录',eyebrow:'开发者工作区',title:'管理你的身份接入应用',intro:'维护开发者资料、提交应用审核，并查看当前审核状态。',
     accountEyebrow:'账户资料',profileTitle:'开发者资料',loading:'加载中',profileHelp:'联系邮箱仅用于联系，不代表已完成邮箱验证。',
-    displayName:'开发者名称',contactEmail:'联系邮箱',saveProfile:'保存资料',catalogEyebrow:'应用',appsTitle:'我的应用',newApp:'新建应用',
+    displayName:'开发者名称',contactEmail:'联系邮箱',saveProfile:'保存资料',sendVerification:'发送验证邮件',verificationSent:'验证邮件已发送，请检查收件箱。',verificationAlready:'该邮箱已验证。',catalogEyebrow:'应用',appsTitle:'我的应用',newApp:'新建应用',
     groupsEyebrow:'身份关联',groupsTitle:'应用组',groupsHelp:'同一所有者的应用组经审核后可用于关联应用身份。',
     groupName:'应用组名称',groupPlaceholder:'输入应用组名称',createGroup:'申请应用组',editorEyebrow:'应用设置',createAppTitle:'创建应用',
     editAppTitle:'编辑应用草稿',editorHelp:'提交审核后，当前已批准版本保持生效；回调地址和资料范围会由运营审核。',
@@ -29,7 +29,7 @@ const t = {
   en: {
     secure:'Secure session',signIn:'Sign in',eyebrow:'DEVELOPER WORKSPACE',title:'Manage your identity applications',intro:'Maintain your developer profile, submit applications for review, and track their status.',
     accountEyebrow:'ACCOUNT',profileTitle:'Developer profile',loading:'Loading',profileHelp:'The contact email is unverified until a separate verification flow is completed.',
-    displayName:'Developer name',contactEmail:'Contact email',saveProfile:'Save profile',catalogEyebrow:'APPLICATIONS',appsTitle:'My applications',newApp:'New application',
+    displayName:'Developer name',contactEmail:'Contact email',saveProfile:'Save profile',sendVerification:'Send verification email',verificationSent:'Verification email sent. Check your inbox.',verificationAlready:'This email is already verified.',catalogEyebrow:'APPLICATIONS',appsTitle:'My applications',newApp:'New application',
     groupsEyebrow:'IDENTITY LINKING',groupsTitle:'Application groups',groupsHelp:'Approved groups can link application identities owned by the same developer.',
     groupName:'Group name',groupPlaceholder:'Enter a group name',createGroup:'Request group',editorEyebrow:'APPLICATION SETTINGS',createAppTitle:'Create application',
     editAppTitle:'Edit application draft',editorHelp:'Submitting a change keeps the approved version active until the new version is reviewed.',
@@ -125,8 +125,10 @@ async function refresh(){
     document.querySelector('#profile-form [name=contactEmail]').value=profile.contactEmail;
     profileState.textContent=profile.contactEmailVerified?tr('verified'):tr('unverified');
     profileState.className='pill '+(profile.contactEmailVerified?'pill-approved':'pill-muted');
+    document.querySelector('#verify-email').hidden=profile.contactEmailVerified;
   }else{
     state.profile=null;state.profileRevision=0;profileState.textContent=tr('profileRequired');profileState.className='pill pill-pending';
+    document.querySelector('#verify-email').hidden=true;
   }
   renderApps();renderGroups();
 }
@@ -213,6 +215,12 @@ document.querySelector('#profile-form').addEventListener('submit',async event=>{
       expectedRevision:state.profileRevision,displayName:form.elements.displayName.value,contactEmail:form.elements.contactEmail.value
     })});
     notice(tr('saveOk'));await refresh()
+  }catch(error){notice(error.message==='AUTH_REQUIRED'?tr('loginRequired'):error.message,'error')}
+});
+document.querySelector('#verify-email').addEventListener('click',async()=>{
+  try{
+    const result=await request('/profile/verification-email',{method:'POST',body:JSON.stringify({})});
+    notice(result==='sent'?tr('verificationSent'):tr('verificationAlready'));await refresh()
   }catch(error){notice(error.message==='AUTH_REQUIRED'?tr('loginRequired'):error.message,'error')}
 });
 document.querySelector('#group-form').addEventListener('submit',async event=>{
