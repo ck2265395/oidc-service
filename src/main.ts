@@ -11,6 +11,7 @@ import { loadConfig } from './config.js';
 import { createProvider } from './provider.js';
 import { createInteractionRouter } from './interactions.js';
 import { createDeveloperRouter } from './developer.js';
+import { createAdminRouter } from './admin.js';
 import { ApplicationService } from './platform.js';
 import { createPlatformPool, PostgresApplicationRepository } from './store.js';
 
@@ -96,7 +97,8 @@ export async function start(): Promise<void> {
       config.issuer,
       config.issuer.startsWith('https:'),
     );
-    const server = createServer(createApplication(config, provider, interactions, developer));
+    const admin = createAdminRouter(oidcPool, config, applications);
+    const server = createServer(createApplication(config, provider, interactions, developer, admin));
 
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
