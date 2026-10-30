@@ -429,6 +429,48 @@ export class PostgresApplicationRepository implements ApplicationRepository, App
     }
   }
 
+  async deleteGroup(record: ApplicationGroupRecord): Promise<boolean> {
+    const connection = await this.pool.connect();
+    try {
+      await connection.query('BEGIN');
+      const locked = await connection.query<{ id: string }>(
+        "SELECT id FROM application_group WHERE id = $1 AND owner_account_uuid = $2 AND revision = $3 AND status IN ('pending', 'rejected') FOR UPDATE",
+        [record.id, record.ownerUuid, record.revision],
+      );
+      if (locked.rowCount !== 1) {
+        await connection.query('ROLLBACK');
+        return false;
+      }
+      const references = await connection.query<{ used: boolean }>(
+        "SELECT EXISTS (SELECT 1 FROM oidc_application WHERE group_id = $1 OR draft_config->>'groupId' = $1 OR approved_config->>'groupId' = $1) AS used",
+        [record.id],
+      );
+      if (references.rows[0]?.used) {
+        await connection.query('ROLLBACK');
+        return false;
+      }
+      const deleted = await connection.query(
+        "DELETE FROM application_group WHERE id = $1 AND owner_account_uuid = $2 AND revision = $3 AND status IN ('pending', 'rejected')",
+        [record.id, record.ownerUuid, record.revision],
+      );
+      if (deleted.rowCount !== 1) {
+        await connection.query('ROLLBACK');
+        return false;
+      }
+      await connection.query(
+        "INSERT INTO platform_audit (actor_type, actor_id, action, outcome, details, created_at) VALUES ('account', $1, 'application_group.delete', 'success', $2::jsonb, now())",
+        [record.ownerUuid, JSON.stringify({ groupId: record.id, revision: record.revision })],
+      );
+      await connection.query('COMMIT');
+      return true;
+    } catch {
+      await this.rollbackQuietly(connection);
+      return false;
+    } finally {
+      connection.release();
+    }
+  }
+
   async getGroup(id: string): Promise<ApplicationGroupRecord | null> {
     try {
       const result = await this.pool.query<GroupRow>(
