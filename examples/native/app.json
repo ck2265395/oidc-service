@@ -2,7 +2,7 @@
   "expo": {
     "name": "DT Identity Native Example",
     "slug": "dt-identity-native-example",
-    "scheme": "dtidentitydemo",
+    "scheme": "org.dt.identitydemo",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
