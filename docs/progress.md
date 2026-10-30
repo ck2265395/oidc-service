@@ -19,7 +19,7 @@ This page records public-safe implementation status. Detailed product requiremen
 ## Not yet accepted end to end
 
 - No live PostgreSQL or Redis deployment has been connected. Redis rate-limit behavior has unit coverage, while database roles, full protocol persistence, and multi-instance behavior still need live integration tests.
-- Redis-backed cross-instance replay/session state and client-cache invalidation are incomplete. Login throttling uses hashed identifier and direct peer address; trusted-proxy address configuration and account-alias aggregation remain to be completed.
+- Redis-backed cross-instance replay/session state and client-cache invalidation are incomplete. Login throttling uses hashed resolved account identifiers (or a hashed submitted identifier when lookup is ambiguous) and the source address resolved through explicitly trusted proxy ranges; live proxy/Redis integration remains unverified.
 - Contact email verification, portal sign-in flow, and full usability/accessibility acceptance for the initial developer UI remain incomplete; approved or disabled application groups cannot be renamed, and groups cannot be deleted.
 - The administrator audit currently records application reviews and user grant revocations; other operational events and audit retention cleanup are incomplete.
 - Web/native relying-party examples, container packaging, deployment/upgrade guidance, and a complete protocol acceptance matrix remain incomplete.
