@@ -195,7 +195,6 @@ export function createUserPortalRouter(
       const verified = await jwtVerify(tokens.id_token, portalJwks(provider, config.issuer), {
         issuer: config.issuer,
         audience: PORTAL_CLIENT_ID,
-        nonce: loginState.nonce,
       });
       const session = await currentSession(request, response);
       if (!session) return error(response, 401, '登录状态已失效，请重新开始。');
