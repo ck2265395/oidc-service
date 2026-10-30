@@ -121,7 +121,7 @@ export function createInteractionRouter(
       const clientName = active?.config.name ?? 'DT Identity';
       const csrf = setCsrf(response, details.uid, csrfKey, secureCookies);
       if (details.prompt.name === 'login') {
-        const form = '<p class="muted">继续使用 ' + escapeHtml(clientName) + ' 登录</p>' +
+        const form = '<p class="muted">继续使用 / Continue signing in with ' + escapeHtml(clientName) + '</p>' +
           '<form method="post" action="/interaction/' + encodeURIComponent(details.uid) + '/login">' +
           '<input type="hidden" name="csrf" value="' + escapeHtml(csrf) + '">' +
           '<label for="identifierType">登录方式 / Sign-in method</label><select id="identifierType" name="identifierType">' +
@@ -129,7 +129,7 @@ export function createInteractionRouter(
           '<label for="identifier">用户名或邮箱 / Username or email</label><input id="identifier" name="identifier" required maxlength="254" autocomplete="username">' +
           '<label for="password">密码 / Password</label><input id="password" type="password" name="password" required maxlength="1024" autocomplete="current-password">' +
           '<button type="submit">登录并继续 / Sign in and continue</button></form>' +
-          '<nav aria-label="账号管理">' +
+          '<nav aria-label="账号管理 / Account options">' +
           (accountPortal?.registrationUrl ? '<a href="' + escapeHtml(accountPortal.registrationUrl) + '" target="_blank" rel="noopener noreferrer">注册账号 / Register</a> ' : '') +
           (accountPortal?.passwordResetUrl ? '<a href="' + escapeHtml(accountPortal.passwordResetUrl) + '" target="_blank" rel="noopener noreferrer">忘记密码 / Reset password</a> ' : '') +
           '</nav>';
