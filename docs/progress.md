@@ -11,7 +11,7 @@ This page records public-safe implementation status. Detailed product requiremen
 - Revision-checked application drafts, owner-scoped listing and editing, approval snapshots, and transactional review history.
 - Web client secrets encrypted with AES-GCM, returned once during creation, and rotated with revision checks. Provider client cache is cleared locally after review and rotation.
 - Upstream oidc-provider startup with persistent RS256 signing keys, S256 PKCE, authorization-code grants, and openid/profile/email scopes.
-- CSRF-protected login and consent interactions, plus a user authorization page with grant revocation.
+- CSRF-protected login and consent interactions; consent shows the approved application purpose, developer, policy links, and human-readable requested data, plus a user authorization page with grant revocation.
 - Revisioned developer profile registration and owner-scoped APIs for application create/list/edit/submit/secret rotation and application-group create/list/rename.
 - Administrator group approval, rejection, disablement, group history, and audit updates in one database transaction.
 - An independent administrator session with scrypt login, direct-peer-IP throttling, idle and absolute expiry, review queue, approve/reject/disable forms, audit view, and database status statistics.
