@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>开发者中心 · DT Identity</title>
+  <link rel="stylesheet" href="/assets/developer.css">
+  <script type="module" src="/assets/developer.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/developer"><span class="brand-mark">DT</span><span>Identity <small>开发者中心</small></span></a>
+    <div class="top-actions">
+      <span class="secure-label"><span class="status-dot"></span><span data-i18n="secure">安全会话</span></span>
+      <button class="button button-quiet" id="language-toggle" type="button" aria-label="切换语言">EN</button>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow" data-i18n="eyebrow">开发者工作区</p>
+        <h1 data-i18n="title">管理你的身份接入应用</h1>
+        <p class="hero-copy" data-i18n="intro">维护开发者资料、提交应用审核，并查看当前审核状态。</p>
+      </div>
+      <span class="hero-icon" aria-hidden="true">↗</span>
+    </section>
+
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+
+    <section class="card profile-card">
+      <div class="section-heading">
+        <div><p class="eyebrow" data-i18n="accountEyebrow">账户资料</p><h2 data-i18n="profileTitle">开发者资料</h2></div>
+        <span id="profile-state" class="pill pill-muted" data-i18n="loading">加载中</span>
+      </div>
+      <p class="section-copy" data-i18n="profileHelp">联系邮箱仅用于联系，不代表已完成邮箱验证。</p>
+      <form id="profile-form" class="form-grid">
+        <label><span data-i18n="displayName">开发者名称</span><input name="displayName" maxlength="100" autocomplete="organization" required></label>
+        <label><span data-i18n="contactEmail">联系邮箱</span><input name="contactEmail" type="email" maxlength="254" autocomplete="email" required></label>
+        <button class="button button-secondary form-submit" type="submit" data-i18n="saveProfile">保存资料</button>
+      </form>
+    </section>
+
+    <div class="workspace-grid">
+      <section class="card">
+        <div class="section-heading">
+          <div><p class="eyebrow" data-i18n="catalogEyebrow">应用</p><h2 data-i18n="appsTitle">我的应用</h2></div>
+          <button class="button button-primary" id="new-app" type="button"><span aria-hidden="true">＋</span> <span data-i18n="newApp">新建应用</span></button>
+        </div>
+        <div id="application-list" class="record-list"><div class="skeleton"></div><div class="skeleton"></div></div>
+      </section>
+      <section class="card">
+        <div class="section-heading">
+          <div><p class="eyebrow" data-i18n="groupsEyebrow">身份关联</p><h2 data-i18n="groupsTitle">应用组</h2></div>
+        </div>
+        <p class="section-copy" data-i18n="groupsHelp">同一所有者的应用组经审核后可用于关联应用身份。</p>
+        <form id="group-form" class="inline-form">
+          <label class="sr-only" for="group-name" data-i18n="groupName">应用组名称</label>
+          <input id="group-name" name="displayName" maxlength="100" required data-placeholder="groupPlaceholder" placeholder="输入应用组名称">
+          <button class="button button-secondary" type="submit" data-i18n="createGroup">申请应用组</button>
+        </form>
+        <div id="group-list" class="record-list compact"></div>
+      </section>
+    </div>
+
+    <section class="card app-editor" id="app-editor" hidden>
+      <div class="section-heading">
+        <div><p class="eyebrow" data-i18n="editorEyebrow">应用设置</p><h2 id="editor-title" data-i18n="createAppTitle">创建应用</h2></div>
+        <button class="button button-quiet" id="close-editor" type="button" data-i18n="close">关闭</button>
+      </div>
+      <p class="section-copy" data-i18n="editorHelp">提交审核后，当前已批准版本保持生效；回调地址和资料范围会由运营审核。</p>
+      <form id="application-form" class="form-grid">
+        <input type="hidden" name="id">
+        <input type="hidden" name="revision">
+        <label><span data-i18n="appType">客户端类型</span><select name="type"><option value="web">Web · 服务端保密客户端</option><option value="spa">SPA · 浏览器公开客户端</option><option value="native">Native · 原生公开客户端</option></select></label>
+        <label><span data-i18n="appName">应用名称</span><input name="name" maxlength="100" required></label>
+        <label class="full"><span data-i18n="description">应用简介</span><textarea name="description" maxlength="1000" rows="2" required></textarea></label>
+        <label class="full"><span data-i18n="purpose">应用用途</span><textarea name="purpose" maxlength="1000" rows="2" required></textarea></label>
+        <label><span data-i18n="homepage">应用主页 HTTPS 地址</span><input name="homepageUrl" type="url" required placeholder="https://"></label>
+        <label><span data-i18n="icon">图标 HTTPS 地址（可选）</span><input name="iconUrl" type="url" placeholder="https://"></label>
+        <label><span data-i18n="privacy">隐私政策 HTTPS 地址</span><input name="privacyUrl" type="url" required placeholder="https://"></label>
+        <label><span data-i18n="terms">服务条款 HTTPS 地址</span><input name="termsUrl" type="url" required placeholder="https://"></label>
+        <label class="full"><span data-i18n="redirects">登录回调地址（每行一个，1–10 个）</span><textarea name="redirectUris" rows="3" required placeholder="https://app.example/callback"></textarea></label>
+        <label class="full"><span data-i18n="logoutRedirects">退出返回地址（每行一个，1–10 个）</span><textarea name="postLogoutRedirectUris" rows="2" required placeholder="https://app.example/logout/callback"></textarea></label>
+        <fieldset class="full scope-field"><legend data-i18n="scopes">申请资料范围</legend><label class="check-row"><input type="checkbox" checked disabled><span>openid · <span data-i18n="scopeIdentity">身份标识</span></span></label><label class="check-row"><input type="checkbox" name="scopeProfile" value="profile"><span>profile · <span data-i18n="scopeProfile">昵称和头像</span></span></label><label class="check-row"><input type="checkbox" name="scopeEmail" value="email"><span>email · <span data-i18n="scopeEmail">邮箱地址</span></span></label></fieldset>
+        <label class="full"><span data-i18n="groupId">应用组 ID（可选）</span><input name="groupId" maxlength="36" placeholder="UUID"></label>
+        <div class="form-actions full"><button class="button button-quiet" id="cancel-editor" type="button" data-i18n="cancel">取消</button><button class="button button-secondary" id="save-app" type="submit" data-i18n="saveDraft">保存草稿</button><button class="button button-primary" id="submit-app" type="button" data-i18n="submitReview">提交审核</button></div>
+      </form>
+    </section>
+    <footer><span>DT Identity</span><span data-i18n="footer">协议接入仅对已批准应用开放</span></footer>
+  </main>
+  <dialog id="secret-dialog" class="secret-dialog">
+    <form method="dialog"><button class="dialog-close" aria-label="Close">×</button></form>
+    <p class="eyebrow" data-i18n="secretEyebrow">仅显示一次</p><h2 data-i18n="secretTitle">保存客户端密钥</h2>
+    <p data-i18n="secretHelp">请立即复制并保存到安全的密钥管理器。关闭后不会再次显示。</p>
+    <code id="secret-value"></code><button class="button button-primary" id="copy-secret" type="button" data-i18n="copySecret">复制密钥</button>
+  </dialog>
+</body>
+</html>
