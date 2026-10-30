@@ -60,7 +60,9 @@ export async function start(): Promise<void> {
   const oidcPool = createPlatformPool(config.databases.oidc);
   const accountPool = createAccountPool(config.databases.accounts);
   const redisClient = createClient({ url: config.redisUrl });
+  const redisSubscriber = redisClient.duplicate();
   redisClient.on('error', () => {});
+  redisSubscriber.on('error', () => {});
   const accountSource = new PostgresAccountSource(accountPool);
   const applicationRepository = new PostgresApplicationRepository(oidcPool, config.mode === 'production' ? 'production' : 'development');
   const applications = new ApplicationService(
@@ -79,7 +81,7 @@ export async function start(): Promise<void> {
   const signingKeys = await readSigningKeys();
 
   try {
-    await Promise.all([oidcPool.query('SELECT 1'), accountPool.query('SELECT 1'), redisClient.connect()]);
+    await Promise.all([oidcPool.query('SELECT 1'), accountPool.query('SELECT 1'), redisClient.connect(), redisSubscriber.connect()]);
     const loginRateLimiter = new RedisLoginRateLimiter(
       redisClient,
       config.secrets.fingerprint,
@@ -96,7 +98,14 @@ export async function start(): Promise<void> {
       signingKeys,
     );
     const providerClient = provider.Client as typeof provider.Client & { cacheClear: (clientId?: string) => void };
-    applications.setClientCacheClearer((clientId) => providerClient.cacheClear(clientId));
+    const cacheInvalidationChannel = 'dt:oidc:client-cache-clear';
+    await redisSubscriber.subscribe(cacheInvalidationChannel, (clientId) => {
+      if (/^[A-Za-z0-9._~-]{1,255}$/.test(clientId)) providerClient.cacheClear(clientId);
+    });
+    applications.setClientCacheClearer((clientId) => {
+      providerClient.cacheClear(clientId);
+      void redisClient.publish(cacheInvalidationChannel, clientId).catch(() => {});
+    });
     const interactions = createInteractionRouter(
       provider,
       accounts,
@@ -120,6 +129,7 @@ export async function start(): Promise<void> {
         oidcPool.query('SELECT 1'),
         accountPool.query('SELECT 1'),
         redisClient.ping(),
+        redisSubscriber.ping(),
       ]);
     };
     const server = createServer(createApplication(config, provider, interactions, developer, admin, userPortal, readiness));
@@ -134,7 +144,7 @@ export async function start(): Promise<void> {
 
     const shutdown = (): void => {
       server.close((error) => {
-        void Promise.all([oidcPool.end(), accountPool.end(), redisClient.isOpen ? redisClient.quit() : Promise.resolve()]).then(() => {
+        void Promise.all([oidcPool.end(), accountPool.end(), redisClient.isOpen ? redisClient.quit() : Promise.resolve(), redisSubscriber.isOpen ? redisSubscriber.quit() : Promise.resolve()]).then(() => {
           if (error) process.exitCode = 1;
         });
       });
