@@ -58,6 +58,9 @@ export async function start(): Promise<void> {
   const applications = new ApplicationService(
     applicationRepository,
     config.mode === 'production' ? 'production' : 'development',
+    undefined,
+    undefined,
+    config.secrets.encryption,
   );
   const accounts = new AccountService(accountSource, {
     legacyHmacKey: config.secrets.legacyHmacKey,
@@ -76,6 +79,7 @@ export async function start(): Promise<void> {
       config.secrets.cookie,
       signingKeys,
     );
+    applications.setClientCacheClearer((clientId) => provider.Client.cacheClear(clientId));
     const interactions = createInteractionRouter(
       provider,
       accounts,
