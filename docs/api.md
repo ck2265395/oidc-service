@@ -64,6 +64,6 @@ Mutating requests require the exact configured issuer origin and the CSRF token 
 - `GET /portal/authorizations` lists the current user’s nonexpired grants. Revocation uses a CSRF-protected same-origin form.
 - `GET /admin/login` starts the separate administrator session flow.
 - `GET /admin/applications` and `GET /admin/groups` show review queues.
-- `GET /admin/audit` and `GET /admin/statistics` show the currently implemented review audit and application status counts.
+- `GET /admin/audit` supports `applicationId`, `from`, `to`, `action`, `outcome`, and `page` filters. Dates use UTC; `to` includes the full day.\n- `GET /admin/statistics?days=7&applicationId=...` aggregates protocol request counts, outcomes, and server latency by application and endpoint for 1–90 days, alongside current application status counts.
 
 The administrator session uses its own HTTP-only cookie and separate PostgreSQL session records. Consumer OIDC sessions do not grant administrator access.
