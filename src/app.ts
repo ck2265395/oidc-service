@@ -13,6 +13,7 @@ export function createApplication(
   developer?: Router,
   admin?: Router,
   userPortal?: Router,
+  readiness?: () => Promise<void>,
 ): Express {
   const app = express();
   const publicDirectory = resolve(process.cwd(), 'public');
@@ -40,6 +41,16 @@ export function createApplication(
 
   app.get('/developer', (_request, response) => {
     response.sendFile(resolve(publicDirectory, 'developer.html'));
+  });
+
+  app.get('/health/ready', async (_request, response) => {
+    try {
+      if (!readiness) throw new Error('Readiness checks are not configured');
+      await readiness();
+      response.status(200).json({ status: 'ok', requestId: response.locals.requestId });
+    } catch {
+      response.status(503).json({ status: 'unavailable', requestId: response.locals.requestId });
+    }
   });
 
   app.get('/health/live', (_request, response) => {
