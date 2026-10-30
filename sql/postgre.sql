@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS oidc_application (
   last_review jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CHECK ((approved_config IS NULL) = (approved_revision IS NULL))
+  CHECK ((approved_config IS NULL) = (approved_revision IS NULL)),
+  CHECK (status <> 'approved' OR approved_config IS NOT NULL)
 );
 
 CREATE INDEX IF NOT EXISTS oidc_application_owner_updated_idx
