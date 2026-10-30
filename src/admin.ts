@@ -50,7 +50,7 @@ function html(title: string, content: string): string {
     'main{border:1px solid #dce3ec;border-radius:12px;padding:1.5rem}label{display:block;margin:1rem 0 .35rem}' +
     'input,select,textarea,button{font:inherit;padding:.65rem;box-sizing:border-box}input,textarea{width:100%}' +
     'button{margin:.7rem .5rem .2rem 0;cursor:pointer}pre{white-space:pre-wrap;background:#f3f5f7;padding:1rem}</style>' +
-    '<main><nav><a href="/admin/applications">审核队列</a></nav><h1>' + escapeHtml(title) + '</h1>' + content + '</main></html>';
+    '<main><nav><a href="/admin/applications">审核队列</a> · <a href="/admin/audit">操作审计</a> · <a href="/admin/statistics">统计</a></nav><h1>' + escapeHtml(title) + '</h1>' + content + '</main></html>';
 }
 
 function sendError(response: Response, status: number, message: string): void {
@@ -215,6 +215,62 @@ export function createAdminRouter(
       response.type('html').send(html('应用审核', content));
     } catch {
       sendError(response, 503, '审核队列暂时不可用。');
+    }
+  });
+
+  router.get('/audit', async (request, response) => {
+    if (!await adminSession(request)) return response.redirect(303, '/admin/login');
+    const page = typeof request.query.page === 'string' && /^[1-9][0-9]*$/.test(request.query.page)
+      ? Number(request.query.page)
+      : 1;
+    const appId = typeof request.query.applicationId === 'string' && request.query.applicationId.length <= 80
+      ? request.query.applicationId
+      : null;
+    const outcome = typeof request.query.outcome === 'string'
+      ? request.query.outcome
+      : null;
+    if (!Number.isSafeInteger(page) || page < 1 || (outcome && !['success', 'denied', 'failure'].includes(outcome))) {
+      return sendError(response, 400, '筛选条件无效。');
+    }
+    try {
+      const offset = (page - 1) * 50;
+      if (!Number.isSafeInteger(offset)) return sendError(response, 400, '页码无效。');
+      const result = await pool.query<{
+        created_at: Date;
+        actor_type: string;
+        actor_id: string | null;
+        action: string;
+        application_id: string | null;
+        outcome: string;
+        details: unknown;
+      }>(
+        'SELECT created_at, actor_type, actor_id, action, application_id, outcome, details FROM platform_audit WHERE ($1::text IS NULL OR application_id::text = $1) AND ($2::text IS NULL OR outcome = $2) ORDER BY created_at DESC, id DESC LIMIT 50 OFFSET $3',
+        [appId, outcome, offset],
+      );
+      const rows = result.rows.map((row) =>
+        '<tr><td>' + escapeHtml(new Date(row.created_at).toISOString()) + '</td><td>' +
+        escapeHtml(row.actor_type) + '</td><td>' + escapeHtml(row.actor_id ?? '') +
+        '</td><td>' + escapeHtml(row.action) + '</td><td>' + escapeHtml(row.application_id ?? '') +
+        '</td><td>' + escapeHtml(row.outcome) + '</td><td><pre>' + escapeHtml(JSON.stringify(row.details)) + '</pre></td></tr>',
+      ).join('');
+      response.type('html').send(html('操作审计', '<table><thead><tr><th>时间</th><th>类型</th><th>操作者</th><th>操作</th><th>应用</th><th>结果</th><th>详情</th></tr></thead><tbody>' + rows + '</tbody></table>'));
+    } catch {
+      sendError(response, 503, '审计记录暂时不可用。');
+    }
+  });
+
+  router.get('/statistics', async (request, response) => {
+    if (!await adminSession(request)) return response.redirect(303, '/admin/login');
+    try {
+      const result = await pool.query<{ status: string; count: string }>(
+        'SELECT status, count(*)::text AS count FROM oidc_application GROUP BY status ORDER BY status',
+      );
+      const rows = result.rows.map((row) =>
+        '<tr><td>' + escapeHtml(row.status) + '</td><td>' + escapeHtml(row.count) + '</td></tr>',
+      ).join('');
+      response.type('html').send(html('应用统计', '<p>统计口径：当前应用记录按状态聚合，使用数据库 UTC 时间戳。</p><table><thead><tr><th>状态</th><th>数量</th></tr></thead><tbody>' + rows + '</tbody></table>'));
+    } catch {
+      sendError(response, 503, '统计数据暂时不可用。');
     }
   });
 
