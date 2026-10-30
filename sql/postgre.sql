@@ -117,8 +117,7 @@ CREATE INDEX IF NOT EXISTS platform_audit_app_created_idx
   ON platform_audit (application_id, created_at DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS admin_session (
-  session_hash text PRIMARY KEY CHECK (session_hash ~ '^[a-f0-9]{64}
-),
+  session_hash text PRIMARY KEY CHECK (session_hash ~ '^[a-f0-9]{64}$'),
   created_at timestamptz NOT NULL DEFAULT now(),
   last_activity timestamptz NOT NULL DEFAULT now()
 );
@@ -127,8 +126,7 @@ CREATE INDEX IF NOT EXISTS admin_session_last_activity_idx
   ON admin_session (last_activity);
 
 CREATE TABLE IF NOT EXISTS admin_login_limit (
-  ip_hash text PRIMARY KEY CHECK (ip_hash ~ '^[a-f0-9]{64}
-),
+  ip_hash text PRIMARY KEY CHECK (ip_hash ~ '^[a-f0-9]{64}$'),
   window_started_at timestamptz NOT NULL DEFAULT now(),
   failed_attempts integer NOT NULL DEFAULT 0 CHECK (failed_attempts >= 0),
   blocked_until timestamptz
