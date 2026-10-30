@@ -101,7 +101,7 @@ export async function start(): Promise<void> {
       config.issuer,
       config.issuer.startsWith('https:'),
     );
-    const admin = createAdminRouter(oidcPool, config, applications);
+    const admin = createAdminRouter(oidcPool, config, applications, groups);
     const userPortal = createUserPortalRouter(oidcPool, provider, accounts, config);
     const server = createServer(createApplication(config, provider, interactions, developer, admin, userPortal));
 
