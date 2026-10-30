@@ -30,7 +30,7 @@ function loginStateKey(state: string, secret: string): string {
 }
 
 function safeReturnPath(value: unknown): string {
-  return value === '/portal/authorizations' ? value : '/developer';
+  return value === '/portal/authorizations' || value === '/portal/profile' ? value : '/developer';
 }
 
 function portalJwks(provider: Provider, issuer: string): ReturnType<typeof createRemoteJWKSet> {
@@ -84,7 +84,7 @@ export function createUserPortalRouter(
   const secure = config.issuer.startsWith('https:');
   const csrfName = secure ? '__Host-dt-user-csrf' : 'dt-user-csrf';
 
-  const currentSession = async (request: Request, response: Response): Promise<{ accountId: string; uuid: string } | null> => {
+  const currentSession = async (request: Request, response: Response): Promise<{ accountId: string; uuid: string; identity: Awaited<ReturnType<AccountService['resolve']>> } | null> => {
     try {
       const context = provider.createContext(request, response);
       const session = await provider.Session.get(context);
@@ -96,7 +96,7 @@ export function createUserPortalRouter(
       const fingerprint = accountId.slice(separator + 1);
       if (!/^[A-Za-z0-9_-]{43}$/.test(fingerprint)) return null;
       const identity = await accounts.resolve(uuid, fingerprint, 'user-portal');
-      return identity ? { accountId, uuid: identity.uuid } : null;
+      return identity ? { accountId, uuid: identity.uuid, identity } : null;
     } catch {
       return null;
     }
@@ -211,6 +211,23 @@ export function createUserPortalRouter(
 
   router.get('/', (_request, response) => response.redirect(303, '/portal/authorizations'));
 
+  router.get('/profile', async (request, response) => {
+    const session = await currentSession(request, response);
+    if (!session) return response.redirect(303, '/portal/sign-in?return=%2Fportal%2Fprofile');
+    const nickname = session.identity?.profile.nickname ?? '未设置 / Not set';
+    const email = session.identity?.profile.email;
+    const maskedEmail = email
+      ? (email.includes('@') ? email.slice(0, 1) + '***' + email.slice(email.indexOf('@')) : '***')
+      : '未提供 / Not provided';
+    const accountLink = config.accountPortal?.profileUrl
+      ? '<p><a href="' + escapeHtml(config.accountPortal.profileUrl) + '" target="_blank" rel="noopener noreferrer">管理资料 / Manage profile</a></p>'
+      : '<p>资料由账号服务维护 / Profile is managed by the account service.</p>';
+    const navigation = '<nav><a href="/portal/profile">个人资料 / Profile</a> · <a href="/portal/authorizations">应用授权 / Authorizations</a></nav>';
+    const content = navigation + '<dl><dt>昵称 / Nickname</dt><dd>' + escapeHtml(nickname) +
+      '</dd><dt>邮箱 / Email</dt><dd>' + escapeHtml(maskedEmail) + '</dd></dl>' + accountLink;
+    response.type('html').send(html('个人资料 / Profile', content));
+  });
+
   router.get('/authorizations', async (request, response) => {
     const session = await currentSession(request, response);
     if (!session) return response.redirect(303, '/portal/sign-in?return=%2Fportal%2Fauthorizations');
@@ -226,6 +243,7 @@ export function createUserPortalRouter(
         [session.accountId],
       );
       const csrf = csrfToken(response);
+      const navigation = '<nav><a href="/portal/profile">个人资料 / Profile</a> · <a href="/portal/authorizations">应用授权 / Authorizations</a></nav>';
       const list = result.rows.map((row) => {
         const name = row.name ?? row.client_id ?? '未知应用';
         return '<li><strong>' + escapeHtml(name) + '</strong><p>权限：' +
@@ -234,7 +252,7 @@ export function createUserPortalRouter(
           escapeHtml(csrf) + '"><button type="submit">撤销授权</button></form></li>';
       }).join('');
       const content = result.rows.length ? '<ul>' + list + '</ul>' : '<p>当前没有应用授权。</p>';
-      response.type('html').send(html('已授权的应用', content));
+      response.type('html').send(html('已授权的应用 / Authorizations', navigation + content));
     } catch {
       error(response, 503, '授权记录暂时不可用。');
     }
