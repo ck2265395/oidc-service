@@ -1,0 +1,35 @@
+{
+  "name": "oidc-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src test scripts eslint.config.js",
+    "test": "tsx --test test/**/*.test.ts",
+    "test:storage": "tsx --test test/storage/**/*.test.ts"
+  },
+  "dependencies": {
+    "express": "5.3.0",
+    "jose": "6.2.13",
+    "oidc-provider": "9.13.2",
+    "pg": "8.23.1",
+    "redis": "6.3.0"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "eslint": "10.13.0",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "typescript-eslint": "8.72.1"
+  }
+}
