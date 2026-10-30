@@ -140,10 +140,8 @@ function showEditor(app=null){
   if(draft){
     for(const key of ['name','description','purpose','homepageUrl','privacyUrl','termsUrl'])form.elements[key].value=draft[key]||'';
     form.elements.iconUrl.value=draft.iconUrl||'';
-    form.elements.redirectUris.value=draft.redirectUris.join('
-');
-    form.elements.postLogoutRedirectUris.value=draft.postLogoutRedirectUris.join('
-');
+    form.elements.redirectUris.value=draft.redirectUris.join('\\n');
+    form.elements.postLogoutRedirectUris.value=draft.postLogoutRedirectUris.join('\\n');
     form.elements.groupId.value=draft.groupId||'';
     form.elements.scopeProfile.checked=draft.scopes.includes('profile');
     form.elements.scopeEmail.checked=draft.scopes.includes('email');
