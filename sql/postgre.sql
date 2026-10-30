@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS developer_profile (
   contact_email text NOT NULL CHECK (char_length(contact_email) <= 254),
   contact_email_verified boolean NOT NULL DEFAULT false,
   revision bigint NOT NULL DEFAULT 1 CHECK (revision > 0),
-  last_review jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -17,6 +16,7 @@ CREATE TABLE IF NOT EXISTS application_group (
   display_name text NOT NULL CHECK (char_length(display_name) BETWEEN 1 AND 100),
   status text NOT NULL CHECK (status IN ('pending', 'approved', 'rejected', 'disabled')),
   revision bigint NOT NULL DEFAULT 1 CHECK (revision > 0),
+  last_review jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (owner_account_uuid, display_name)
