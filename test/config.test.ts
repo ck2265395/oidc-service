@@ -99,3 +99,16 @@ test('rejects a non-integer port outside the TCP range', () => {
 
   assert.throws(() => loadConfig(input), /port/);
 });
+test('validates explicitly trusted proxy CIDRs', () => {
+  const input = validConfig();
+  input.trustedProxyCidrs = ['127.0.0.1', '10.20.0.0/16', '2001:db8::/32'];
+  assert.deepEqual(loadConfig(input).trustedProxyCidrs, input.trustedProxyCidrs);
+});
+
+test('rejects malformed or overly broad proxy configuration entries', () => {
+  for (const entry of ['proxy.local', '10.0.0.0/33', '127.0.0.1\\t']) {
+    const input = validConfig();
+    input.trustedProxyCidrs = [entry];
+    assert.throws(() => loadConfig(input), /trustedProxyCidrs/);
+  }
+});
