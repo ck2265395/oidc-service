@@ -115,6 +115,7 @@ export async function start(): Promise<void> {
       config.secrets.cookie,
       config.issuer.startsWith('https:'),
       loginRateLimiter,
+      config.accountPortal,
     );
     const emailVerification = mailer
       ? new DeveloperEmailVerification(redisClient, applications, config.issuer, mailer.send)
