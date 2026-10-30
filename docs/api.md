@@ -4,7 +4,7 @@
 - `GET /health/ready` checks the OIDC database, read-only account database, and Redis; it returns `503` when a required dependency is unavailable.
 - Login throttling defaults to 10 attempts per resolved account and 100 per trusted source IP within 15 minutes. `loginRateLimit` can tune these values in protected configuration; Redis failures reject login attempts.
 
-The bilingual service landing page is served at `/`. It links to user authorizations, the developer portal, and the administrator sign-in. The developer portal is served at `/developer` with static assets under `/assets/`. `/developer/login` starts the first-party portal sign-in using authorization code + S256 PKCE; `/portal/sign-in` and `/portal/callback` hold a short-lived, single-use Redis login transaction and verify the returned ID token. The developer portal uses the same owner-scoped APIs documented below; an active identity-service session is required.
+The bilingual service landing page is served at `/`. The user portal provides `/portal/profile` and `/portal/authorizations`, the developer portal is at `/developer`, and the administrator sign-in is at `/admin/login`. The developer portal is served at `/developer` with static assets under `/assets/`. `/developer/login` starts the first-party portal sign-in using authorization code + S256 PKCE; `/portal/sign-in` and `/portal/callback` hold a short-lived, single-use Redis login transaction and verify the returned ID token. The developer portal uses the same owner-scoped APIs documented below; an active identity-service session is required.
 
 All application APIs require an active OIDC provider session. Successful responses use:
 
@@ -14,7 +14,7 @@ All application APIs require an active OIDC provider session. Successful respons
 
 Errors use the same shape with a stable nonzero code and an appropriate HTTP status. Responses include no-store headers.
 
-## Developer profile
+## Current user profile\n\n- `GET /api/v1/me` requires the current identity-service session and rechecks account status and credential version. It returns only nickname, masked email, and a safe HTTPS picture URL when available; it never returns internal account identifiers. Relative picture paths are omitted unless `profilePictureBaseUrl` is configured.\n\n## Developer profile
 
 First request a CSRF token:
 
