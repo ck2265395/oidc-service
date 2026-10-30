@@ -26,7 +26,7 @@ const validConfig = () => ({
     accounts: 'postgres://reader:secret@localhost:5432/accounts_test',
   },
   redisUrl: 'redis://localhost:6379/0',
-  trustedProxyCidrs: [],
+  trustedProxyCidrs: [] as string[],
 });
 
 test('accepts a complete test configuration', () => {
