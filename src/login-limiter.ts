@@ -1,6 +1,5 @@
 import { createHmac } from 'node:crypto';
 
-import type { RedisClientType } from 'redis';
 
 export class LoginRateLimitError extends Error {
   constructor(readonly retryAfterSeconds: number) {
@@ -22,9 +21,13 @@ const INCREMENT_SCRIPT = [
   "return {1, 0, accountCount, ipCount}",
 ].join('\n');
 
+interface RedisEvalClient {
+  eval(script: string, options: { keys: string[]; arguments: string[] }): Promise<unknown>;
+}
+
 export class RedisLoginRateLimiter {
   constructor(
-    private readonly redis: RedisClientType,
+    private readonly redis: RedisEvalClient,
     private readonly key: string,
     private readonly windowSeconds = 900,
     private readonly accountLimit = 10,
