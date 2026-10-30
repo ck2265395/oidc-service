@@ -217,7 +217,7 @@ export class ApplicationService {
       typeof contactEmail !== 'string' ||
       contactEmail.trim() !== contactEmail ||
       contactEmail.length > 254 ||
-      !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(contactEmail) ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail) ||
       !Number.isSafeInteger(expectedRevision) ||
       expectedRevision < 0
     ) {
