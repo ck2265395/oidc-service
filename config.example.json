@@ -24,5 +24,6 @@
     "accountAttempts": 10,
     "ipAttempts": 100
   },
-  "smtp": null
+  "smtp": null,
+  "accountPortal": null
 }
