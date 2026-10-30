@@ -15,7 +15,9 @@ Install Node.js 24, npm 11, and the iOS or Android native toolchain. Then:
 ```sh
 cd examples/native
 npm install
-EXPO_PUBLIC_OIDC_ISSUER=https://identity.example EXPO_PUBLIC_OIDC_CLIENT_ID=approved-native-client-id npx expo prebuild
+export EXPO_PUBLIC_OIDC_ISSUER=https://identity.example
+export EXPO_PUBLIC_OIDC_CLIENT_ID=approved-native-client-id
+npx expo prebuild
 npx expo run:android
 # Or: npx expo run:ios
 ```
