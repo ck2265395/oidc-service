@@ -10,6 +10,7 @@ export function createApplication(
   provider?: Provider,
   interactions?: Router,
   developer?: Router,
+  admin?: Router,
 ): Express {
   const app = express();
 
@@ -38,6 +39,7 @@ export function createApplication(
 
   if (interactions) app.use('/interaction', interactions);
   if (developer) app.use('/api/v1/developer', developer);
+  if (admin) app.use('/admin', admin);
   if (provider) app.use(provider.callback());
 
   app.use((_request, response) => {
