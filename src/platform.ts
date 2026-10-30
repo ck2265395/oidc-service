@@ -257,6 +257,10 @@ export class ApplicationService {
     return { clientSecret };
   }
 
+  async getForAdmin(id: string): Promise<ApplicationRecord | null> {
+    return this.repository.getApplication(id);
+  }
+
   async getOwned(id: string, ownerUuid: string): Promise<ApplicationRecord | null> {
     return this.repository.getOwnedApplication(id, ownerUuid);
   }
