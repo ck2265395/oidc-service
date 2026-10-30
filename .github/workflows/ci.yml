@@ -53,6 +53,9 @@ jobs:
         run: node --check public/developer.js
       - name: Web example JavaScript syntax
         run: node --check examples/web-client/server.js
+      - name: Native example TSX syntax
+        run: |
+          node --input-type=module -e "import ts from 'typescript'; import { readFileSync } from 'node:fs'; const result = ts.transpileModule(readFileSync('examples/native/App.tsx', 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 }, reportDiagnostics: true }); if (result.diagnostics?.length) { console.error(result.diagnostics); process.exit(1); }"
       - name: Unit and HTTP tests
         run: npm test
       - name: PostgreSQL and Redis integration tests
