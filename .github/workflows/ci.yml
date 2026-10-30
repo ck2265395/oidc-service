@@ -27,6 +27,8 @@ jobs:
         run: npm run check
       - name: Lint
         run: npm run lint
+      - name: Frontend JavaScript syntax
+        run: node --check public/developer.js
       - name: Unit and HTTP tests
         run: npm test
       - name: Build
