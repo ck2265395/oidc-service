@@ -89,7 +89,7 @@ export async function start(): Promise<void> {
     );
     const provider = createProvider(
       config.issuer,
-      createOidcAdapterFactory(oidcPool, applications),
+      createOidcAdapterFactory(oidcPool, applications, redisClient),
       accounts,
       applications,
       config.secrets.cookie,
