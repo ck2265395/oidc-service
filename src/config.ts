@@ -111,7 +111,7 @@ function trustedProxyCidrsAt(value: unknown): string[] {
     throw new ConfigError('trustedProxyCidrs must be an array with at most 32 entries');
   }
   return value.map((entry, index) => {
-    if (typeof entry !== 'string' || entry.length === 0 || entry.trim() !== entry || /\\s/.test(entry)) {
+    if (typeof entry !== 'string' || entry.length === 0 || entry.trim() !== entry || /\s/.test(entry)) {
       throw new ConfigError(`trustedProxyCidrs[${index}] must be an IP address or CIDR`);
     }
     const parts = entry.split('/');
