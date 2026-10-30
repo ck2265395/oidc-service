@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { createHmac, randomBytes } from 'node:crypto';
 import test from 'node:test';
 
-import { AccountService, type AccountRecord, type AccountSource } from '../src/accounts.js';
+import { AccountService, PostgresAccountSource, claimsForScopes, type AccountRecord, type AccountSource } from '../src/accounts.js';
+import type { Pool } from 'pg';
 
 const legacyHmacKey = 'independent-test-only-legacy-key';
 const fingerprintKey = randomBytes(32).toString('base64url');
@@ -116,4 +117,42 @@ test('subjects are stable within a sector and isolated across sectors', async ()
   assert.ok(otherSector);
   assert.equal(first.sub, same.sub);
   assert.notEqual(first.sub, otherSector.sub);
+});
+test('OIDC profile claims are limited to the requested scopes', async () => {
+  const identity = await service([account()]).authenticate(
+    { type: 'username', value: 'tester' },
+    'correct horse battery',
+  );
+  assert.ok(identity);
+
+  const profile = claimsForScopes(identity, new Set(['profile']));
+  assert.deepEqual(profile, { name: 'Test Person' });
+  assert.equal('email' in profile, false);
+  assert.equal('email_verified' in profile, false);
+
+  const email = claimsForScopes(identity, new Set(['email']));
+  assert.deepEqual(email, { email: 'test@example.invalid' });
+  assert.equal('name' in email, false);
+});
+
+test('PostgreSQL account lookup uses a fixed SELECT and parameterized values', async () => {
+  let capturedQuery = '';
+  let capturedValues: unknown[] | undefined;
+  const fakePool = {
+    query: async (query: string, values?: unknown[]) => {
+      capturedQuery = query;
+      capturedValues = values;
+      return { rows: [] };
+    },
+    end: async () => undefined,
+  } as unknown as Pool;
+  const accounts = new PostgresAccountSource(fakePool);
+  const attackerInput = "name' OR 1=1 --";
+
+  await accounts.lookup('email', attackerInput);
+
+  assert.match(capturedQuery, /^SELECT /);
+  assert.match(capturedQuery, /FROM "USER" WHERE "email" = \$1 LIMIT 2$/);
+  assert.deepEqual(capturedValues, [attackerInput]);
+  await accounts.close();
 });
