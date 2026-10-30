@@ -253,9 +253,9 @@ export function createUserPortalRouter(
         return '<li><strong>' + escapeHtml(name) + '</strong><p>权限 / Permissions: ' +
           escapeHtml(row.scope ?? 'openid') + '</p><p>状态 / Status: ' + escapeHtml(status) +
           ' · 授权时间 / Authorized: ' + escapeHtml(new Date(row.created_at).toISOString()) +
-          '</p><a href="/authorizations/' + encodeURIComponent(row.document_id) + '/confirm-revoke">撤销授权 / Revoke</a></li>';
+          '</p><a href="/portal/authorizations/' + encodeURIComponent(row.document_id) + '/confirm-revoke">撤销授权 / Revoke</a></li>';
       }).join('');
-      const content = result.rows.length ? '<ul>' + list + '</ul>' : '<p>当前没有应用授权。</p>';
+      const content = result.rows.length ? '<ul>' + list + '</ul>' : '<p>当前没有应用授权 / No applications are authorized.</p>';
       response.type('html').send(html('已授权的应用 / Authorizations', navigation + content));
     } catch {
       error(response, 503, '授权记录暂时不可用。');
@@ -282,10 +282,10 @@ export function createUserPortalRouter(
       const content = '<p><strong>' + escapeHtml(row.name ?? '应用 / Application') +
         '</strong> 将无法继续使用此平台授权。此操作不会删除该应用中的本地账号或会话。 / The application will lose access to this grant. Its local account and session are not deleted.</p>' +
         '<p>权限 / Permissions: ' + escapeHtml(row.scope ?? 'openid') + '</p>' +
-        '<form method="post" action="/authorizations/' + encodeURIComponent(grantId) + '/revoke">' +
+        '<form method="post" action="/portal/authorizations/' + encodeURIComponent(grantId) + '/revoke">' +
         '<input type="hidden" name="csrf" value="' + escapeHtml(csrf) + '">' +
         '<button type="submit">确认撤销 / Confirm revocation</button></form>' +
-        '<p><a href="/authorizations">返回 / Back</a></p>';
+        '<p><a href="/portal/authorizations">返回 / Back</a></p>';
       response.type('html').send(html('确认撤销授权 / Confirm authorization revocation', content));
     } catch {
       error(response, 503, '授权记录暂时不可用 / Authorization data is unavailable.');
@@ -293,20 +293,20 @@ export function createUserPortalRouter(
   });
 
   router.post('/authorizations/:id/revoke', async (request, response) => {
-    if (!validatePost(request)) return error(response, 403, '请求校验失败，请重新打开授权页面。');
+    if (!validatePost(request)) return error(response, 403, '请求校验失败，请重新打开授权页面 / Request validation failed. Reopen the authorization page.');
     const session = await currentSession(request, response);
-    if (!session) return error(response, 401, '登录状态已失效。');
+    if (!session) return error(response, 401, '登录状态已失效 / The sign-in session has expired.');
     const grantId = request.params.id;
-    if (!grantId || grantId.length > 128) return error(response, 404, '授权记录不存在。');
+    if (!grantId || grantId.length > 128) return error(response, 404, '授权记录不存在 / Authorization not found.');
 
     try {
       const row = await pool.query<{ document_id: string }>(
         "SELECT document_id FROM oidc_document WHERE model = 'Grant' AND document_id = $1 AND payload->>'accountId' = $2 LIMIT 1",
         [grantId, session.accountId],
       );
-      if (row.rowCount !== 1) return error(response, 404, '授权记录不存在。');
+      if (row.rowCount !== 1) return error(response, 404, '授权记录不存在 / Authorization not found.');
       const grant = await provider.Grant.find(grantId);
-      if (!grant || grant.accountId !== session.accountId) return error(response, 404, '授权记录不存在。');
+      if (!grant || grant.accountId !== session.accountId) return error(response, 404, '授权记录不存在 / Authorization not found.');
       await grant.adapter.revokeByGrantId(grantId);
       await grant.destroy();
       await pool.query(
@@ -315,7 +315,7 @@ export function createUserPortalRouter(
       );
       response.redirect(303, '/portal/authorizations');
     } catch {
-      error(response, 503, '撤销授权失败，请稍后重试。');
+      error(response, 503, '撤销授权失败，请稍后重试 / Revocation failed. Try again later.');
     }
   });
 
