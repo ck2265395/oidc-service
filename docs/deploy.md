@@ -13,7 +13,7 @@ The account database is never migrated or written by this service. Configure its
 
 The developer contact-email verification workflow is enabled only when the protected configuration contains an `smtp` object. The example configuration uses `null`, which leaves email verification unavailable and never marks an address verified.
 
-Configure `host`, `port`, `secure`, and `from`; set `user` and `password` together when the relay requires authentication. Keep the password in the protected runtime configuration or secret manager. With `secure: false`, the transport requires STARTTLS and TLS 1.2 or newer. Verify relay reachability and sender authorization in the target environment before enabling the workflow. Verification messages contain a single-use link that expires after 30 minutes; requests are limited per account.
+Configure `host`, `port`, `secure`, and `from`; set `user` and `password` together when the relay requires authentication. Keep the password in the protected runtime configuration or secret manager. With `secure: false`, the transport requires STARTTLS and TLS 1.2 or newer. Verify relay reachability and sender authorization in the target environment before enabling the workflow. Verification messages contain a single-use link that expires after 30 minutes; a same-origin confirmation form consumes it, and requests are limited per account.
 
 ## Container deployment
 
