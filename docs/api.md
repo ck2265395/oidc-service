@@ -1,0 +1,61 @@
+# API guide
+
+All application APIs require an active OIDC provider session. Successful responses use:
+
+```json
+{ "code": 0, "desc": "ok", "data": {} }
+```
+
+Errors use the same shape with a stable nonzero code and an appropriate HTTP status. Responses include no-store headers.
+
+## Developer profile
+
+First request a CSRF token:
+
+```http
+GET /api/v1/developer/csrf
+```
+
+Then register the developer profile:
+
+```http
+PUT /api/v1/developer/profile
+Origin: https://identity.example
+X-CSRF-Token: <token>
+Content-Type: application/json
+
+{
+  "expectedRevision": 0,
+  "displayName": "Example developer",
+  "contactEmail": "dev@example.invalid"
+}
+```
+
+Use the returned revision for subsequent profile updates. Contact email verification is not implemented; the API never marks an address verified.
+
+## Application groups
+
+- `GET /api/v1/developer/groups?page=1&pageSize=20`
+- `POST /api/v1/developer/groups` with `{ "displayName": "Example group" }`
+
+Creating a group requires a registered developer profile. New groups start in pending review. Applications can reference only groups owned by the same account; shared subjects use the group only after approval.
+
+## Applications
+
+- `GET /api/v1/developer/applications?page=1&pageSize=20`
+- `POST /api/v1/developer/applications` with `{ "type": "web|spa|native", "draft": { ... } }`
+- `GET /api/v1/developer/applications/:id`
+- `PATCH /api/v1/developer/applications/:id` with `expectedRevision` and `draft`
+- `POST /api/v1/developer/applications/:id/submit` with `expectedRevision`
+- `POST /api/v1/developer/applications/:id/rotate-secret` with `expectedRevision`
+
+Mutating requests require the exact configured issuer origin and the CSRF token in the `X-CSRF-Token` header. Web client creation returns a high-entropy client secret once. Store it in the client server’s secret manager; it is never included in the ordinary application response. Rotation invalidates the previous value. Public clients do not receive a secret.
+
+## User and administrator pages
+
+- `GET /portal/authorizations` lists the current user’s nonexpired grants. Revocation uses a CSRF-protected same-origin form.
+- `GET /admin/login` starts the separate administrator session flow.
+- `GET /admin/applications` and `GET /admin/groups` show review queues.
+- `GET /admin/audit` and `GET /admin/statistics` show the currently implemented review audit and application status counts.
+
+The administrator session uses its own HTTP-only cookie and separate PostgreSQL session records. Consumer OIDC sessions do not grant administrator access.
