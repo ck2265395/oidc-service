@@ -7,6 +7,7 @@ import { AccountService } from './accounts.js';
 import { ApplicationValidationError, type ClientType } from './applications.js';
 import { ApplicationConflictError, type ApplicationRecord, type ApplicationStatus, ApplicationService } from './platform.js';
 import { ApplicationGroupError, type ApplicationGroupService } from './groups.js';
+import { DeveloperEmailVerification, EmailVerificationError } from './email-verification.js';
 
 interface Body {
   [key: string]: unknown;
@@ -82,6 +83,7 @@ export function createDeveloperRouter(
   groups: ApplicationGroupService,
   issuer: string,
   secureCookies: boolean,
+  emailVerification: DeveloperEmailVerification | null = null,
 ): Router {
   const router = Router();
   router.use(express.json({ limit: '32kb' }));
@@ -159,6 +161,42 @@ export function createDeveloperRouter(
     } catch (error) {
       if (error instanceof ApplicationConflictError) return jsonError(response, 409, 'profile_conflict', error.message);
       jsonError(response, 503, 'storage_unavailable', 'Developer profile is unavailable');
+    }
+  });
+
+  router.post('/profile/verification-email', async (request, response) => {
+    if (!ensureWriteRequest(request, response)) return;
+    const ownerUuid = await authenticatedOwner(request, response);
+    if (!ownerUuid) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
+    if (!emailVerification) return jsonError(response, 503, 'email_delivery_unavailable', 'Email verification is not configured');
+    try {
+      const result = await emailVerification.request(ownerUuid);
+      response.status(result === 'sent' ? 202 : 200).json({ code: 0, desc: 'ok', data: result });
+    } catch (error) {
+      if (error instanceof EmailVerificationError) {
+        const status = error.message.includes('recently') ? 429 : error.message.includes('profile') ? 409 : 503;
+        return jsonError(response, status, 'verification_unavailable', error.message);
+      }
+      jsonError(response, 503, 'email_delivery_unavailable', 'Email verification is unavailable');
+    }
+  });
+
+  router.get('/verify-email', async (request, response) => {
+    const token = scalar(request.query.token);
+    if (!emailVerification || !token) {
+      return response.status(400).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Email verification · DT Identity</title><h1>Verification link is invalid or expired</h1></html>');
+    }
+    try {
+      const verified = await emailVerification.consume(token);
+      const title = verified ? 'Email verified' : 'Verification link is invalid or expired';
+      const heading = verified ? 'Your contact email is verified.' : 'Verification link is invalid or expired.';
+      response.status(verified ? 200 : 400).type('html').send(
+        '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>' + title + ' · DT Identity</title><main><h1>' + heading +
+        '</h1><p>You may close this page and return to the developer center.</p><a href="/developer">Developer center</a></main></html>',
+      );
+    } catch {
+      response.status(503).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Unavailable · DT Identity</title><h1>Verification is temporarily unavailable</h1></html>');
     }
   });
 
