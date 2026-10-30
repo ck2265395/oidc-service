@@ -1,19 +1,21 @@
 # DT Identity Service
 
-独立开发的 OIDC 身份服务项目，使用 **DT／东土** 作为项目署名。当前分支正在搭建可验证的服务基础；OIDC 协议流程和业务门户尚未完成，不可用于生产环境。
+独立开发的 OIDC 身份服务项目，项目署名使用 **DT／东土**。实现仍在开发中，不可用于生产环境。
 
 ## 技术基线
 
-- Node.js 24 LTS、TypeScript、Express
-- OIDC 协议由上游 `oidc-provider` 处理
-- PostgreSQL 与 Redis 用于后续的持久化和跨实例状态
-- 业务账号存储配置为只读连接
+- Node.js 24、TypeScript、Express
+- OIDC 协议由上游 oidc-provider 处理
+- PostgreSQL 保存平台应用与 OIDC 协议状态
+- 账号库通过只读连接查询；Redis 跨实例集成尚未完成
 
-## 当前状态
+## 当前实现
 
-现有代码仅包含严格配置校验、HTTP 健康检查和基础 CI 脚手架。后续功能按阶段加入；每个阶段以测试和验收记录为准。完整需求材料保存在项目维护方处，仓库只添加经过确认可公开的实现与说明。
+仓库包含严格配置校验、受保护密钥工具、只读账号认证、应用配置校验、审核状态与 PostgreSQL 存储，以及上游 OIDC Provider 配置和 CSRF 保护的登录/授权同意页面。
 
-## 开发
+仍未完成开发者门户、管理员后台、应用组与客户端密钥生命周期。Web 保密客户端目前不会被协议适配器加载。真实数据库权限、Redis、多实例、容器、Web/native 接入示例和完整端到端验收也未完成。详细产品需求材料不存放在本公共仓库。
+
+## 检查
 
 ```sh
 npm ci
@@ -23,8 +25,14 @@ npm test
 npm run build
 ```
 
-配置模板位于 [config.example.json](config.example.json)。不要将实际密钥、管理员凭据、数据库连接串或 `.env` 文件提交到 Git。
+CI 在每次分支更新时自动运行上述检查。
 
-## 运行状态
+## 运行准备
 
-`GET /health/live` 用于存活探测。当前服务没有开放 OIDC 登录或令牌端点。
+1. 复制 config.example.json 到受保护的配置路径，并填入账号只读库、OIDC 数据库、Redis URL、管理员摘要及现有账号系统的 HMAC 密钥。
+2. 使用 npm run keys -- --out <受保护路径> 生成密钥材料；把其中的 cookie、fingerprint、subject、encryption 值填入配置。
+3. 设置 OIDC_CONFIG_FILE 和 OIDC_SIGNING_KEY_FILE，分别指向受保护配置和密钥文件。
+4. 在隔离的 OIDC 数据库执行 sql/postgre.sql。
+5. 执行 npm run build && npm start。
+
+不要提交实际密钥、管理员凭据、数据库连接串或 .env 文件。服务依赖真实数据库和现有账号库配置；本仓库当前未完成生产部署验证。
