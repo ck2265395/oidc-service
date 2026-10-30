@@ -108,7 +108,7 @@ test('validates explicitly trusted proxy CIDRs', () => {
 });
 
 test('rejects malformed or overly broad proxy configuration entries', () => {
-  for (const entry of ['proxy.local', '10.0.0.0/33', '127.0.0.1\\t']) {
+  for (const entry of ['proxy.local', '10.0.0.0/33', '127.0.0.1\t']) {
     const input = validConfig();
     input.trustedProxyCidrs = [entry];
     assert.throws(() => loadConfig(input), /trustedProxyCidrs/);
