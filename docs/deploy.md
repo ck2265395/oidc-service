@@ -36,7 +36,8 @@ The Compose PostgreSQL initialization runs `sql/postgre.sql` only when the data 
 - `GET /health/live` reports process liveness.
 - `GET /health/ready` checks PostgreSQL, the account database, and Redis.
 - Terminate with SIGTERM; the service closes HTTP, PostgreSQL, and Redis connections.
-- Run `npm run clean:expired` on a schedule from one maintenance job to remove expired OIDC documents, administrator sessions and login limits, plus audit records older than 90 days. The command touches only the OIDC database and deletes in batches of 5,000.\n- Back up PostgreSQL and Redis data volumes using the platform’s approved backup process. Signing keys and service secrets require separate encrypted backup and access controls.
+- Run `npm run clean:expired` on a schedule from one maintenance job to remove expired OIDC documents, administrator sessions and login limits, plus audit records older than 90 days. The command touches only the OIDC database and deletes in batches of 5,000.
+- Back up PostgreSQL and Redis data volumes using the platform’s approved backup process. Signing keys and service secrets require separate encrypted backup and access controls.
 - Rotate signing keys with a planned JWKS overlap and client coordination. The current key loader accepts one active RS256 signing key; automated rotation is not implemented.
 
 ## Deployment acceptance still required
