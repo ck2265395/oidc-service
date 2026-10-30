@@ -18,7 +18,8 @@ const redisUrl = process.env.REDIS_TEST_URL;
 test('PostgreSQL repositories and Redis security controls work across connections', {
   skip: !databaseUrl || !redisUrl,
 }, async () => {
-  const pool = createPlatformPool(databaseUrl!);
+  if (!databaseUrl || !redisUrl) return;
+  const pool = createPlatformPool(databaseUrl);
   const redisA = createClient({ url: redisUrl });
   const redisB = createClient({ url: redisUrl! });
   const ownerUuid = randomUUID();
