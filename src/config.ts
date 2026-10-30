@@ -23,6 +23,7 @@ export interface ServiceConfig {
   };
   redisUrl: string;
   trustedProxyCidrs: string[];
+  loginRateLimit: { windowSeconds: number; accountAttempts: number; ipAttempts: number };
 }
 
 export class ConfigError extends Error {
@@ -132,6 +133,22 @@ function trustedProxyCidrsAt(value: unknown): string[] {
   });
 }
 
+function rateLimitConfigAt(value: unknown): ServiceConfig['loginRateLimit'] {
+  const input = value === undefined ? {} : objectAt(value, 'loginRateLimit');
+  const integer = (key: string, fallback: number, minimum: number, maximum: number): number => {
+    const candidate = input[key] === undefined ? fallback : input[key];
+    if (!Number.isSafeInteger(candidate) || Number(candidate) < minimum || Number(candidate) > maximum) {
+      throw new ConfigError(`loginRateLimit.${key} must be an integer between ${minimum} and ${maximum}`);
+    }
+    return Number(candidate);
+  };
+  return {
+    windowSeconds: integer('windowSeconds', 900, 60, 86400),
+    accountAttempts: integer('accountAttempts', 10, 1, 1000),
+    ipAttempts: integer('ipAttempts', 100, 1, 10000),
+  };
+}
+
 export function loadConfig(input: unknown): ServiceConfig {
   const root = objectAt(input, 'config');
   const modeValue = stringAt(root.mode, 'mode');
@@ -187,5 +204,6 @@ export function loadConfig(input: unknown): ServiceConfig {
     },
     redisUrl: urlAt(root.redisUrl, 'redisUrl', ['redis:', 'rediss:']),
     trustedProxyCidrs: trustedProxyCidrsAt(root.trustedProxyCidrs),
+    loginRateLimit: rateLimitConfigAt(root.loginRateLimit),
   };
 }
