@@ -154,7 +154,7 @@ export function createInteractionRouter(
 
       return errorPage(response);
     } catch {
-      return errorPage(response);
+      return errorPage(response, 503);
     }
   });
 
