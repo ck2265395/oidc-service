@@ -27,6 +27,7 @@ export interface ApplicationGroupPage {
 export interface ApplicationGroupRepository {
   createGroup(record: ApplicationGroupRecord): Promise<void>;
   getOwnedGroup(id: string, ownerUuid: string): Promise<ApplicationGroupRecord | null>;
+  getGroup(id: string): Promise<ApplicationGroupRecord | null>;
   listOwnedGroups(ownerUuid: string, page: number, pageSize: number): Promise<ApplicationGroupPage>;
   listGroupsForAdmin(status: ApplicationGroupStatus, page: number, pageSize: number): Promise<ApplicationGroupPage>;
   reviewGroup(previous: ApplicationGroupRecord, next: ApplicationGroupRecord): Promise<boolean>;
@@ -89,8 +90,7 @@ export class ApplicationGroupService {
     command: { action: 'approve' | 'reject' | 'disable'; reviewerUuid: string; reason?: string },
     reviewedAt = new Date().toISOString(),
   ): Promise<ApplicationGroupRecord | null> {
-    const current = await this.repository.getOwnedGroup(id, '__admin_lookup__');
-    const record = current ?? await this.repository.getGroupForAdmin?.(id) ?? null;
+    const record = await this.repository.getGroup(id);
     if (!record) return null;
     if (!Number.isSafeInteger(expectedRevision) || record.revision !== expectedRevision) {
       throw new ApplicationGroupError();
