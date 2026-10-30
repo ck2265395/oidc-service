@@ -114,7 +114,7 @@ export async function start(): Promise<void> {
       config.issuer.startsWith('https:'),
     );
     const admin = createAdminRouter(oidcPool, config, applications, groups);
-    const userPortal = createUserPortalRouter(oidcPool, provider, accounts, config);
+    const userPortal = createUserPortalRouter(oidcPool, provider, accounts, config, redisClient);
     const readiness = async (): Promise<void> => {
       await Promise.all([
         oidcPool.query('SELECT 1'),
