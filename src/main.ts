@@ -9,6 +9,7 @@ import { createApplication } from './app.js';
 import { createOidcAdapterFactory } from './adapter.js';
 import { loadConfig } from './config.js';
 import { createProvider } from './provider.js';
+import { createInteractionRouter } from './interactions.js';
 import { ApplicationService } from './platform.js';
 import { createPlatformPool, PostgresApplicationRepository } from './store.js';
 
@@ -75,7 +76,14 @@ export async function start(): Promise<void> {
       config.secrets.cookie,
       signingKeys,
     );
-    const server = createServer(createApplication(config, provider));
+    const interactions = createInteractionRouter(
+      provider,
+      accounts,
+      applications,
+      config.secrets.cookie,
+      config.issuer.startsWith('https:'),
+    );
+    const server = createServer(createApplication(config, provider, interactions));
 
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
