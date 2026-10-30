@@ -26,7 +26,7 @@ async function main(): Promise<void> {
         total += deleted;
         if (deleted < BATCH_SIZE) break;
       }
-      process.stdout.write(label + ': ' + total + ' removed\\n');
+      process.stdout.write(label + ': ' + total + ' removed\n');
     }
   } finally {
     await pool.end();
@@ -34,6 +34,6 @@ async function main(): Promise<void> {
 }
 
 main().catch(() => {
-  process.stderr.write('Expired data cleanup failed. Check protected configuration and database availability.\\n');
+  process.stderr.write('Expired data cleanup failed. Check protected configuration and database availability.\n');
   process.exitCode = 1;
 });
