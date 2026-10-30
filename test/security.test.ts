@@ -4,9 +4,11 @@ import test from 'node:test';
 
 import {
   constantTimeEqual,
+  escapeHtml,
   decryptSecret,
   encryptSecret,
   hashScryptPassword,
+  randomToken,
   verifyScryptPassword,
 } from '../src/security.js';
 
@@ -44,4 +46,12 @@ test('scrypt password hashes verify only the original password', () => {
   assert.equal(verifyScryptPassword('wrong password', hash), false);
   assert.equal(verifyScryptPassword('long test password', 'scrypt$999999999$8$1$x$y'), false);
   assert.equal(verifyScryptPassword('long test password', 'not-a-hash'), false);
+});
+test('random tokens and HTML escaping use safe formats', () => {
+  assert.match(randomToken(), /^[A-Za-z0-9_-]{43}$/);
+  assert.throws(() => randomToken(1));
+  assert.equal(
+    escapeHtml(`<script attr="x">&'`),
+    '&lt;script attr=&quot;x&quot;&gt;&amp;&#39;',
+  );
 });
