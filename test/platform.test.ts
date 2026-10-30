@@ -163,7 +163,7 @@ class MemoryRepository implements ApplicationRepository {
 
 test('application service derives ownership from the caller and waits for approval', async () => {
   const repository = new MemoryRepository();
-  const service = new ApplicationService(repository, 'production', () => 'app-id', () => 'client-id');
+  const service = new ApplicationService(repository, 'production', () => 'app-id', () => 'client-id', Buffer.alloc(32, 7).toString('base64url'));
   const created = await service.create('owner-a', 'web', validDraft('Draft'));
 
   assert.equal(created.ownerUuid, 'owner-a');
@@ -197,7 +197,7 @@ test('application service refuses groups owned by another account', async () => 
 
 test('shared subjects wait for both application and group approval', async () => {
   const repository = new MemoryRepository();
-  const service = new ApplicationService(repository, 'production', () => 'grouped-app', () => 'grouped-client');
+  const service = new ApplicationService(repository, 'production', () => 'grouped-app', () => 'grouped-client', Buffer.alloc(32, 7).toString('base64url'));
   const ownerUuid = 'owner-a';
   const groupId = 'a23e4567-e89b-42d3-a456-426614174000';
   repository.groups.add(ownerUuid + ':' + groupId);
