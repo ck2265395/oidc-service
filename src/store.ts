@@ -26,7 +26,15 @@ export interface ApplicationPage {
 }
 
 export interface ApplicationRepository {
-  createApplication(record: ApplicationRecord): Promise<void>;
+  createApplication(record: ApplicationRecord, encryptedClientSecret?: string | null): Promise<void>;
+  getEncryptedClientSecret?(clientId: string): Promise<string | null>;
+  rotateEncryptedClientSecret?(
+    clientId: string,
+    ownerUuid: string,
+    expectedRevision: number,
+    previousEnvelope: string,
+    nextEnvelope: string,
+  ): Promise<boolean>;
   getApplication(id: string): Promise<ApplicationRecord | null>;
   getOwnedApplication(id: string, ownerUuid: string): Promise<ApplicationRecord | null>;
   getApplicationByClientId(clientId: string): Promise<ApplicationRecord | null>;
@@ -182,10 +190,10 @@ export class PostgresApplicationRepository implements ApplicationRepository {
     private readonly environment: RuntimeEnvironment,
   ) {}
 
-  async createApplication(record: ApplicationRecord): Promise<void> {
+  async createApplication(record: ApplicationRecord, encryptedClientSecret: string | null = null): Promise<void> {
     try {
       await this.pool.query(
-        'INSERT INTO oidc_application (id, owner_account_uuid, client_id, client_type, revision, status, draft_config, approved_config, approved_revision, group_id, last_review) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11::jsonb)',
+        'INSERT INTO oidc_application (id, owner_account_uuid, client_id, client_type, revision, status, draft_config, approved_config, approved_revision, encrypted_client_secret, group_id, last_review) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12::jsonb)',
         [
           record.id,
           record.ownerUuid,
@@ -196,6 +204,7 @@ export class PostgresApplicationRepository implements ApplicationRepository {
           JSON.stringify(record.draft),
           record.approvedConfig === null ? null : JSON.stringify(record.approvedConfig),
           record.approvedRevision,
+          encryptedClientSecret,
           record.draft.groupId,
           record.lastReview === null ? null : JSON.stringify(record.lastReview),
         ],
@@ -224,6 +233,36 @@ export class PostgresApplicationRepository implements ApplicationRepository {
       'SELECT ' + APPLICATION_COLUMNS + ' FROM oidc_application WHERE client_id = $1 LIMIT 1',
       [clientId],
     );
+  }
+
+  async getEncryptedClientSecret(clientId: string): Promise<string | null> {
+    try {
+      const result = await this.pool.query<{ encrypted_client_secret: string | null }>(
+        "SELECT encrypted_client_secret FROM oidc_application WHERE client_id = $1 AND status = 'approved' LIMIT 1",
+        [clientId],
+      );
+      return result.rows[0]?.encrypted_client_secret ?? null;
+    } catch {
+      throw new PlatformStorageError();
+    }
+  }
+
+  async rotateEncryptedClientSecret(
+    clientId: string,
+    ownerUuid: string,
+    expectedRevision: number,
+    previousEnvelope: string,
+    nextEnvelope: string,
+  ): Promise<boolean> {
+    try {
+      const result = await this.pool.query(
+        "UPDATE oidc_application SET encrypted_client_secret = $1, updated_at = now() WHERE client_id = $2 AND owner_account_uuid = $3 AND revision = $4 AND status = 'approved' AND encrypted_client_secret = $5",
+        [nextEnvelope, clientId, ownerUuid, expectedRevision, previousEnvelope],
+      );
+      return result.rowCount === 1;
+    } catch {
+      throw new PlatformStorageError();
+    }
   }
 
   async groupOwnedBy(ownerUuid: string, groupId: string): Promise<boolean> {
