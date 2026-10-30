@@ -18,6 +18,7 @@ import { ApplicationService } from './platform.js';
 import { ApplicationGroupService } from './groups.js';
 import { createPlatformPool, PostgresApplicationRepository } from './store.js';
 import { RedisLoginRateLimiter } from './login-limiter.js';
+import { DeveloperEmailVerification, createVerificationMailer } from './email-verification.js';
 
 function record(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -57,6 +58,7 @@ export async function start(): Promise<void> {
 
   const rawConfig = JSON.parse(await readFile(configPath, 'utf8')) as unknown;
   const config = loadConfig(rawConfig);
+  const mailer = config.smtp ? createVerificationMailer(config.smtp) : null;
   const oidcPool = createPlatformPool(config.databases.oidc);
   const accountPool = createAccountPool(config.databases.accounts);
   const redisClient = createClient({ url: config.redisUrl });
@@ -114,6 +116,9 @@ export async function start(): Promise<void> {
       config.issuer.startsWith('https:'),
       loginRateLimiter,
     );
+    const emailVerification = mailer
+      ? new DeveloperEmailVerification(redisClient, applications, config.issuer, mailer.send)
+      : null;
     const developer = createDeveloperRouter(
       provider,
       accounts,
@@ -121,6 +126,7 @@ export async function start(): Promise<void> {
       groups,
       config.issuer,
       config.issuer.startsWith('https:'),
+      emailVerification,
     );
     const admin = createAdminRouter(oidcPool, config, applications, groups);
     const userPortal = createUserPortalRouter(oidcPool, provider, accounts, config, redisClient);
@@ -145,6 +151,7 @@ export async function start(): Promise<void> {
     const shutdown = (): void => {
       server.close((error) => {
         void Promise.all([oidcPool.end(), accountPool.end(), redisClient.isOpen ? redisClient.quit() : Promise.resolve(), redisSubscriber.isOpen ? redisSubscriber.quit() : Promise.resolve()]).then(() => {
+          mailer?.close();
           if (error) process.exitCode = 1;
         });
       });
@@ -152,6 +159,7 @@ export async function start(): Promise<void> {
     process.once('SIGTERM', shutdown);
     process.once('SIGINT', shutdown);
   } catch (error) {
+    mailer?.close();
     await Promise.allSettled([oidcPool.end(), accountPool.end(), redisClient.isOpen ? redisClient.quit() : Promise.resolve(), redisSubscriber.isOpen ? redisSubscriber.quit() : Promise.resolve()]);
     throw error;
   }
