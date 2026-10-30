@@ -195,6 +195,11 @@ export class ApplicationService {
     return this.repository.getDeveloperProfile(accountUuid);
   }
 
+  async verifyDeveloperEmail(accountUuid: string, contactEmail: string): Promise<boolean> {
+    if (!this.repository.verifyDeveloperEmail) throw new ApplicationConflictError('Developer email verification storage is unavailable');
+    return this.repository.verifyDeveloperEmail(accountUuid, contactEmail);
+  }
+
   async saveDeveloperProfile(
     accountUuid: string,
     input: unknown,
