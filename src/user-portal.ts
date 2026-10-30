@@ -136,6 +136,10 @@ export function createUserPortalRouter(
       if (!grant || grant.accountId !== session.accountId) return error(response, 404, '授权记录不存在。');
       await grant.adapter.revokeByGrantId(grantId);
       await grant.destroy();
+      await pool.query(
+        "INSERT INTO platform_audit (actor_type, actor_id, action, application_id, outcome, details) SELECT 'account', $1, 'authorization.revoke', id, 'success', '{}'::jsonb FROM oidc_application WHERE client_id = $2",
+        [session.uuid, grant.clientId ?? null],
+      );
       response.redirect(303, '/portal/authorizations');
     } catch {
       error(response, 503, '撤销授权失败，请稍后重试。');
