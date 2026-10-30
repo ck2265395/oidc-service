@@ -25,7 +25,7 @@ npm test
 npm run build
 ```
 
-GitHub Actions 在每次分支更新时运行类型检查、Lint、前端和 Web 示例语法检查、单元/HTTP 测试、临时 PostgreSQL/Redis 存储集成测试与构建。
+GitHub Actions 在每次分支更新时运行类型检查、Lint、前端/Web/Native 示例语法检查、单元/HTTP 测试、临时 PostgreSQL/Redis 存储集成测试与构建。
 
 ## 运行准备
 
