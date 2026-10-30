@@ -7,7 +7,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 const ISSUER = process.env.EXPO_PUBLIC_OIDC_ISSUER ?? 'https://identity.example';
 const CLIENT_ID = process.env.EXPO_PUBLIC_OIDC_CLIENT_ID ?? 'approved-native-client-id';
-const REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: 'org.dt.identitydemo', path: 'callback' });
+const REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: 'org.dt.identitydemo', path: 'callback', isTripleSlashed: true });
 
 export default function App() {
   const discovery = AuthSession.useAutoDiscovery(ISSUER);
