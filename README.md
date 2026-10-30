@@ -29,7 +29,7 @@ GitHub Actions 在每次分支更新时自动运行上述检查。
 
 ## 运行准备
 
-1. 复制 config.example.json 到受保护的配置路径，并填入账号只读库、OIDC 数据库、Redis URL、管理员摘要及现有账号系统的 HMAC 密钥。
+1. 复制 config.example.json 到受保护的配置路径，并填入账号只读库、OIDC 数据库、Redis URL、管理员摘要及现有账号系统的 HMAC 密钥；若部署在反向代理后，仅在 `trustedProxyCidrs` 中列出实际代理网段。
 2. 使用 npm run keys -- --out <受保护路径> 生成密钥材料；把其中的 cookie、fingerprint、subject、encryption 值填入配置。
 3. 设置 OIDC_CONFIG_FILE 和 OIDC_SIGNING_KEY_FILE，分别指向受保护配置和密钥文件。
 4. 在隔离的 OIDC 数据库执行 sql/postgre.sql。
