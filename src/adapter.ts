@@ -27,11 +27,14 @@ export class PostgresOidcAdapter implements Adapter {
   ) {}
 
   async upsert(id: string, payload: AdapterPayload, expiresIn?: number): Promise<void> {
-    if (this.model === 'Client' || this.model === 'ReplayDetection') {
+    if (this.model === 'Client') {
       throw new Error('OIDC adapter write rejected');
     }
-    const expiry = Number.isSafeInteger(expiresIn) && (expiresIn as number) > 0
-      ? new Date(Date.now() + (expiresIn as number) * 1000).toISOString()
+    const ttl = this.model === 'ReplayDetection' && (!Number.isSafeInteger(expiresIn) || (expiresIn as number) < 1)
+      ? 60
+      : expiresIn;
+    const expiry = Number.isSafeInteger(ttl) && (ttl as number) > 0
+      ? new Date(Date.now() + (ttl as number) * 1000).toISOString()
       : null;
     try {
       const result = await this.pool.query(
@@ -40,7 +43,7 @@ export class PostgresOidcAdapter implements Adapter {
         'ON CONFLICT (model, document_id) DO UPDATE SET payload = EXCLUDED.payload, ' +
         'expires_at = EXCLUDED.expires_at, grant_id = EXCLUDED.grant_id, ' +
         'account_uuid = EXCLUDED.account_uuid, client_id = EXCLUDED.client_id ' +
-        "WHERE $1 <> 'ReplayDetection' OR oidc_document.expires_at IS NULL OR oidc_document.expires_at <= now()",
+        "WHERE $1 <> 'ReplayDetection' OR oidc_document.expires_at <= now()",
         [
           this.model,
           id,
