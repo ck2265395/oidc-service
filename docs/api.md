@@ -44,6 +44,7 @@ Use the returned revision for subsequent profile updates. Contact email verifica
 - `GET /api/v1/developer/groups?page=1&pageSize=20`
 - `POST /api/v1/developer/groups` with `{ "displayName": "Example group" }`
 - `PUT /api/v1/developer/groups/:id` with `expectedRevision` and `displayName` (only pending or rejected groups can be renamed; the rename returns the group to pending review)
+- `DELETE /api/v1/developer/groups/:id` with `expectedRevision` (only pending or rejected groups with no application references can be deleted; successful deletion is audited)
 
 Creating a group requires a registered developer profile. New groups start in pending review. Applications can reference only groups owned by the same account; shared subjects use the group only after approval.
 
