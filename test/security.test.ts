@@ -25,7 +25,8 @@ test('rejects modified ciphertext and malformed encryption keys', () => {
   const envelope = encryptSecret('sensitive-value', key);
   const [version, iv, ciphertext, tag] = envelope.split('.');
 
-  assert.throws(() => decryptSecret(`${version}.${iv}.${ciphertext}.${tag.slice(0, -1)}x`, key));
+  const changedTag = `${tag[0] === 'a' ? 'b' : 'a'}${tag.slice(1)}`;
+  assert.throws(() => decryptSecret(`${version}.${iv}.${ciphertext}.${changedTag}`, key));
   assert.throws(() => decryptSecret(envelope, testKey()));
   assert.throws(() => encryptSecret('value', 'short'));
 });
