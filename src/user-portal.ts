@@ -5,7 +5,7 @@ import type Provider from 'oidc-provider';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { Pool } from 'pg';
 
-import { AccountService } from './accounts.js';
+import { AccountService, safeProfilePictureUrl } from './accounts.js';
 import type { ServiceConfig } from './config.js';
 import { escapeHtml } from './security.js';
 import { PORTAL_CLIENT_ID } from './provider.js';
@@ -219,11 +219,13 @@ export function createUserPortalRouter(
     const maskedEmail = email
       ? (email.includes('@') ? email.slice(0, 1) + '***' + email.slice(email.indexOf('@')) : '***')
       : '未提供 / Not provided';
+    const picture = safeProfilePictureUrl(session.identity?.profile.picture ?? null, config.profilePictureBaseUrl);
+    const pictureMarkup = picture ? '<img src="' + escapeHtml(picture) + '" alt="头像 / Profile picture" width="96" height="96">' : '';
     const accountLink = config.accountPortal?.profileUrl
       ? '<p><a href="' + escapeHtml(config.accountPortal.profileUrl) + '" target="_blank" rel="noopener noreferrer">管理资料 / Manage profile</a></p>'
       : '<p>资料由账号服务维护 / Profile is managed by the account service.</p>';
     const navigation = '<nav><a href="/portal/profile">个人资料 / Profile</a> · <a href="/portal/authorizations">应用授权 / Authorizations</a></nav>';
-    const content = navigation + '<dl><dt>昵称 / Nickname</dt><dd>' + escapeHtml(nickname) +
+    const content = navigation + pictureMarkup + '<dl><dt>昵称 / Nickname</dt><dd>' + escapeHtml(nickname) +
       '</dd><dt>邮箱 / Email</dt><dd>' + escapeHtml(maskedEmail) + '</dd></dl>' + accountLink;
     response.type('html').send(html('个人资料 / Profile', content));
   });
