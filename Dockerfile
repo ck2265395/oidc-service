@@ -1,7 +1,7 @@
 FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN npm install --package-lock-only --ignore-scripts --no-audit --no-fund && npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 
@@ -9,7 +9,7 @@ FROM node:24-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
+RUN npm install --package-lock-only --ignore-scripts --no-audit --no-fund && npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --from=build --chown=node:node /app/public ./public
 COPY --from=build --chown=node:node /app/sql ./sql
