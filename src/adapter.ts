@@ -3,6 +3,12 @@ import type { Pool } from 'pg';
 
 import type { ApplicationService } from './platform.js';
 
+interface RedisStateStore {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, options: { EX: number; NX: true }): Promise<string | null>;
+  del(key: string): Promise<number>;
+}
+
 interface StoredRow {
   payload: AdapterPayload;
 }
@@ -24,6 +30,7 @@ export class PostgresOidcAdapter implements Adapter {
     private readonly model: string,
     private readonly pool: Pool,
     private readonly applications: ApplicationService,
+    private readonly redis?: RedisStateStore,
   ) {}
 
   async upsert(id: string, payload: AdapterPayload, expiresIn?: number): Promise<void> {
@@ -36,6 +43,17 @@ export class PostgresOidcAdapter implements Adapter {
     const expiry = Number.isSafeInteger(ttl) && (ttl as number) > 0
       ? new Date(Date.now() + (ttl as number) * 1000).toISOString()
       : null;
+    if (this.model === 'ReplayDetection') {
+      if (!this.redis) throw new Error('OIDC replay storage is unavailable');
+      const replayTtl = Number.isSafeInteger(ttl) && (ttl as number) > 0 ? ttl as number : 60;
+      try {
+        const result = await this.redis.set('dt:oidc:replay:' + id, JSON.stringify(payload), { EX: replayTtl, NX: true });
+        if (result !== 'OK') throw new Error('OIDC replay rejected');
+        return;
+      } catch {
+        throw new Error('OIDC replay storage write failed');
+      }
+    }
     try {
       const result = await this.pool.query(
         'INSERT INTO oidc_document (model, document_id, payload, expires_at, grant_id, account_uuid, client_id) ' +
@@ -62,6 +80,14 @@ export class PostgresOidcAdapter implements Adapter {
 
   async find(id: string): Promise<AdapterPayload | undefined> {
     if (this.model === 'Client') return this.findApprovedClient(id);
+    if (this.model === 'ReplayDetection') {
+      if (!this.redis) throw new Error('OIDC replay storage is unavailable');
+      try {
+        return toPayload(await this.redis.get('dt:oidc:replay:' + id));
+      } catch {
+        throw new Error('OIDC replay storage read failed');
+      }
+    }
     return this.fetch('document_id = $1', [id]);
   }
 
@@ -85,6 +111,15 @@ export class PostgresOidcAdapter implements Adapter {
   }
 
   async destroy(id: string): Promise<void> {
+    if (this.model === 'ReplayDetection') {
+      if (!this.redis) throw new Error('OIDC replay storage is unavailable');
+      try {
+        await this.redis.del('dt:oidc:replay:' + id);
+        return;
+      } catch {
+        throw new Error('OIDC replay storage delete failed');
+      }
+    }
     try {
       await this.pool.query('DELETE FROM oidc_document WHERE model = $1 AND document_id = $2', [this.model, id]);
     } catch {
@@ -150,6 +185,7 @@ export class PostgresOidcAdapter implements Adapter {
 export function createOidcAdapterFactory(
   pool: Pool,
   applications: ApplicationService,
+  redis?: RedisStateStore,
 ): AdapterFactory {
-  return (model: string): Adapter => new PostgresOidcAdapter(model, pool, applications);
+  return (model: string): Adapter => new PostgresOidcAdapter(model, pool, applications, redis);
 }
