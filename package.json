@@ -18,7 +18,8 @@
     "test": "tsx --test test/*.test.ts",
     "test:storage": "tsx --test test/storage/*.test.ts",
     "migrate": "node dist/scripts/migrate.js",
-    "clean:expired": "node dist/scripts/clean-expired.js"
+    "clean:expired": "node dist/scripts/clean-expired.js",
+    "sbom": "npm sbom --sbom-format=cyclonedx --sbom-type=application --omit=dev > sbom.cdx.json"
   },
   "dependencies": {
     "express": "5.3.0",
