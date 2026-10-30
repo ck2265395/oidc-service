@@ -12,6 +12,7 @@ import { createProvider } from './provider.js';
 import { createInteractionRouter } from './interactions.js';
 import { createDeveloperRouter } from './developer.js';
 import { createAdminRouter } from './admin.js';
+import { createUserPortalRouter } from './user-portal.js';
 import { ApplicationService } from './platform.js';
 import { createPlatformPool, PostgresApplicationRepository } from './store.js';
 
@@ -98,7 +99,8 @@ export async function start(): Promise<void> {
       config.issuer.startsWith('https:'),
     );
     const admin = createAdminRouter(oidcPool, config, applications);
-    const server = createServer(createApplication(config, provider, interactions, developer, admin));
+    const userPortal = createUserPortalRouter(oidcPool, provider, accounts, config);
+    const server = createServer(createApplication(config, provider, interactions, developer, admin, userPortal));
 
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
