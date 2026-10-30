@@ -1,4 +1,4 @@
-import { Provider, type AdapterFactory } from 'oidc-provider';
+import { Provider, type AdapterFactory, type JWKS } from 'oidc-provider';
 
 import { AccountService, claimsForScopes } from './accounts.js';
 import type { ApplicationService } from './platform.js';
@@ -24,9 +24,11 @@ export function createProvider(
   accounts: AccountService,
   applications: ApplicationService,
   cookieKey: string,
+  signingKeys: JWKS,
 ): Provider {
   const provider = new Provider(issuer, {
     adapter,
+    jwks: signingKeys,
     findAccount: async (ctx, accountId) => {
       const handle = parseAccountHandle(accountId);
       const clientId = ctx.oidc.client?.clientId;
