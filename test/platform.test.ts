@@ -140,6 +140,10 @@ class MemoryRepository implements ApplicationRepository {
     return this.groups.has(ownerUuid + ':' + groupId);
   }
 
+  async groupApprovedBy(ownerUuid: string, groupId: string) {
+    return this.groups.has(ownerUuid + ':' + groupId);
+  }
+
   async compareAndSwap(previous: import('../src/platform.js').ApplicationRecord, next: import('../src/platform.js').ApplicationRecord) {
     const current = this.records.get(previous.id);
     if (!current || current.revision !== previous.revision || current.status !== previous.status) return false;
