@@ -4,7 +4,7 @@
 - `GET /health/ready` checks the OIDC database, read-only account database, and Redis; it returns `503` when a required dependency is unavailable.
 - Login throttling defaults to 10 attempts per resolved account and 100 per trusted source IP within 15 minutes. `loginRateLimit` can tune these values in protected configuration; Redis failures reject login attempts.
 
-The bilingual service landing page is served at `/`. It links to user authorizations, the developer portal, and the administrator sign-in. The developer portal is served at `/developer` with static assets under `/assets/`. It uses the same owner-scoped APIs documented below; an active identity-service session is required.
+The bilingual service landing page is served at `/`. It links to user authorizations, the developer portal, and the administrator sign-in. The developer portal is served at `/developer` with static assets under `/assets/`. `/developer/login` starts the first-party portal sign-in using authorization code + S256 PKCE; `/portal/sign-in` and `/portal/callback` hold a short-lived, single-use Redis login transaction and verify the returned ID token. The developer portal uses the same owner-scoped APIs documented below; an active identity-service session is required.
 
 All application APIs require an active OIDC provider session. Successful responses use:
 
