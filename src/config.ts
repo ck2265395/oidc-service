@@ -66,9 +66,12 @@ function urlAt(value: unknown, path: string, protocols: string[]): string {
 }
 
 function secretAt(value: unknown, path: string): string {
-  const secret = stringAt(value, path, 32);
-  if (/^(replace|change|example|your)[-_]/i.test(secret)) {
-    throw new ConfigError(`${path} must be replaced with a strong secret`);
+  const secret = stringAt(value, path, 43);
+  const alphabet = /^[A-Za-z0-9_-]+$/.test(secret);
+  const diversity = new Set(secret).size;
+
+  if (!alphabet || diversity < 16 || /^(replace|change|example|your)[-_]/i.test(secret)) {
+    throw new ConfigError(`${path} must be a strong base64url secret`);
   }
   return secret;
 }
@@ -91,9 +94,19 @@ export function loadConfig(input: unknown): ServiceConfig {
     throw new ConfigError('port must be an integer between 1 and 65535');
   }
 
-  const secrets = objectAt(root.secrets, 'secrets');
+  const secretsInput = objectAt(root.secrets, 'secrets');
   const admin = objectAt(root.admin, 'admin');
   const databases = objectAt(root.databases, 'databases');
+  const secrets = {
+    cookie: secretAt(secretsInput.cookie, 'secrets.cookie'),
+    fingerprint: secretAt(secretsInput.fingerprint, 'secrets.fingerprint'),
+    subject: secretAt(secretsInput.subject, 'secrets.subject'),
+    encryption: secretAt(secretsInput.encryption, 'secrets.encryption'),
+  };
+
+  if (new Set(Object.values(secrets)).size !== Object.keys(secrets).length) {
+    throw new ConfigError('secrets must be independent');
+  }
 
   const username = stringAt(admin.username, 'admin.username');
   if (username.length > 128) {
@@ -109,12 +122,7 @@ export function loadConfig(input: unknown): ServiceConfig {
     mode,
     issuer: issuer.replace(/\/$/, ''),
     port: Number(root.port),
-    secrets: {
-      cookie: secretAt(secrets.cookie, 'secrets.cookie'),
-      fingerprint: secretAt(secrets.fingerprint, 'secrets.fingerprint'),
-      subject: secretAt(secrets.subject, 'secrets.subject'),
-      encryption: secretAt(secrets.encryption, 'secrets.encryption'),
-    },
+    secrets,
     admin: { username, passwordHash },
     databases: {
       oidc: urlAt(databases.oidc, 'databases.oidc', ['postgres:', 'postgresql:']),
