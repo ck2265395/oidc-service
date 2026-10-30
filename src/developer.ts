@@ -6,6 +6,7 @@ import type Provider from 'oidc-provider';
 import { AccountService } from './accounts.js';
 import { ApplicationValidationError, type ClientType } from './applications.js';
 import { ApplicationConflictError, type ApplicationRecord, type ApplicationStatus, ApplicationService } from './platform.js';
+import { ApplicationGroupError, type ApplicationGroupService } from './groups.js';
 
 interface Body {
   [key: string]: unknown;
@@ -78,6 +79,7 @@ export function createDeveloperRouter(
   provider: Provider,
   accounts: AccountService,
   applications: ApplicationService,
+  groups: ApplicationGroupService,
   issuer: string,
   secureCookies: boolean,
 ): Router {
@@ -127,6 +129,35 @@ export function createDeveloperRouter(
       maxAge: 30 * 60 * 1000,
     });
     response.json({ code: 0, desc: 'ok', data: { token } });
+  });
+
+  router.get('/groups', async (request, response) => {
+    const ownerUuid = await authenticatedOwner(request, response);
+    if (!ownerUuid) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
+    const page = positiveInteger(request.query.page, 1);
+    const pageSize = positiveInteger(request.query.pageSize, 20);
+    if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100) {
+      return jsonError(response, 400, 'invalid_pagination', 'Pagination is invalid');
+    }
+    try {
+      const result = await groups.listOwned(ownerUuid, page, pageSize);
+      response.json({ code: 0, desc: 'ok', data: { total: result.total, list: result.list } });
+    } catch {
+      jsonError(response, 503, 'storage_unavailable', 'Application group data is unavailable');
+    }
+  });
+
+  router.post('/groups', async (request, response) => {
+    if (!ensureWriteRequest(request, response)) return;
+    const ownerUuid = await authenticatedOwner(request, response);
+    if (!ownerUuid) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
+    try {
+      const group = await groups.create(ownerUuid, body(request).displayName);
+      response.status(201).json({ code: 0, desc: 'ok', data: group });
+    } catch (error) {
+      if (error instanceof ApplicationGroupError) return jsonError(response, 400, 'invalid_group', error.message);
+      jsonError(response, 503, 'storage_unavailable', 'Application group data is unavailable');
+    }
   });
 
   router.get('/applications', async (request, response) => {
