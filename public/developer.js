@@ -150,8 +150,7 @@ function showEditor(app=null){
 }
 function readDraft(form){
   const data=new FormData(form);
-  const lines=name=>String(data.get(name)||'').split(/\r?
-/).map(value=>value.trim()).filter(Boolean);
+  const lines=name=>String(data.get(name)||'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
   return {
     name:String(data.get('name')||''),description:String(data.get('description')||''),purpose:String(data.get('purpose')||''),
     homepageUrl:String(data.get('homepageUrl')||''),privacyUrl:String(data.get('privacyUrl')||''),termsUrl:String(data.get('termsUrl')||''),
