@@ -22,7 +22,7 @@ This page records public-safe implementation status. Detailed product requiremen
 - Protocol documents still use PostgreSQL; Redis pub/sub now distributes client-cache invalidations, and atomic replay detection, login throttling, and portal login transactions use Redis. Login counters hash resolved account identifiers (or submitted identifiers when lookup is ambiguous) and source addresses resolved through explicitly trusted proxy ranges. Live Redis/proxy integration and missed-notification recovery remain unverified.
 - Contact email verification, full usability/accessibility acceptance for the initial developer UI remains incomplete; approved or disabled application groups cannot be renamed, and groups cannot be deleted.
 - The administrator audit currently records application reviews and user grant revocations; other operational events and audit retention cleanup are incomplete.
-- Web/native relying-party examples, container packaging, deployment/upgrade guidance, and a complete protocol acceptance matrix remain incomplete.
+- Web/native relying-party examples, production-grade schema migration/upgrade automation, target-environment acceptance, and a complete protocol acceptance matrix remain incomplete. A Dockerfile and Compose stack for the service, PostgreSQL, and Redis are provided; the existing account database remains an external read-only dependency.
 - This branch is for development. No production readiness or complete OIDC service is claimed.
 
 The detailed internal requirements were not copied to this public repository.
