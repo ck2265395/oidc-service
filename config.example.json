@@ -18,5 +18,10 @@
     "accounts": "postgres://readonly_user:password@127.0.0.1:5432/accounts"
   },
   "redisUrl": "redis://127.0.0.1:6379/0",
-  "trustedProxyCidrs": []
+  "trustedProxyCidrs": [],
+  "loginRateLimit": {
+    "windowSeconds": 900,
+    "accountAttempts": 10,
+    "ipAttempts": 100
+  }
 }
