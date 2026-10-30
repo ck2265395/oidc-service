@@ -29,6 +29,7 @@ export function createProvider(
   const provider = new Provider(issuer, {
     adapter,
     jwks: signingKeys,
+    scopes: ['openid', 'profile', 'email'],
     findAccount: async (ctx, accountId) => {
       const handle = parseAccountHandle(accountId);
       const clientId = ctx.oidc.client?.clientId;
