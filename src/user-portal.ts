@@ -152,7 +152,7 @@ export function createUserPortalRouter(
       authorization.searchParams.set('code_challenge_method', 'S256');
       response.redirect(303, authorization.toString());
     } catch {
-      error(response, 503, '登录服务暂时不可用，请稍后重试。');
+      error(response, 503, '登录服务暂时不可用，请稍后重试 / Sign-in service is temporarily unavailable. Try again later.');
     }
   });
 
@@ -160,7 +160,7 @@ export function createUserPortalRouter(
     const state = scalar(request.query.state);
     const code = scalar(request.query.code);
     if (!state || !/^[A-Za-z0-9_-]{43}$/.test(state) || !code || code.length > 4096) {
-      return error(response, 400, '登录事务无效，请重新开始。');
+      return error(response, 400, '登录事务无效，请重新开始 / Invalid sign-in transaction. Start again.');
     }
 
     try {
@@ -168,14 +168,14 @@ export function createUserPortalRouter(
         keys: [loginStateKey(state, config.secrets.cookie)],
         arguments: [],
       });
-      if (typeof stored !== 'string') return error(response, 400, '登录事务已失效，请重新开始。');
+      if (typeof stored !== 'string') return error(response, 400, '登录事务已失效，请重新开始 / Sign-in transaction expired. Start again.');
       const parsed = JSON.parse(stored) as unknown;
       if (
         typeof parsed !== 'object' || parsed === null || Array.isArray(parsed) ||
         typeof (parsed as PortalState).verifier !== 'string' ||
         typeof (parsed as PortalState).nonce !== 'string' ||
         typeof (parsed as PortalState).returnTo !== 'string'
-      ) return error(response, 400, '登录事务无效，请重新开始。');
+      ) return error(response, 400, '登录事务无效，请重新开始 / Invalid sign-in transaction. Start again.');
       const loginState = parsed as PortalState;
       const tokenResponse = await fetch(config.issuer + '/token', {
         method: 'POST',
@@ -189,23 +189,23 @@ export function createUserPortalRouter(
         }),
         signal: AbortSignal.timeout(5000),
       });
-      if (!tokenResponse.ok) return error(response, 400, '登录验证失败，请重新开始。');
+      if (!tokenResponse.ok) return error(response, 400, '登录验证失败，请重新开始 / Sign-in verification failed. Start again.');
       const tokens = await tokenResponse.json() as Record<string, unknown>;
-      if (typeof tokens.id_token !== 'string') return error(response, 400, '登录验证失败，请重新开始。');
+      if (typeof tokens.id_token !== 'string') return error(response, 400, '登录验证失败，请重新开始 / Sign-in verification failed. Start again.');
       const verified = await jwtVerify(tokens.id_token, portalJwks(provider, config.issuer), {
         issuer: config.issuer,
         audience: PORTAL_CLIENT_ID,
       });
       const session = await currentSession(request, response);
-      if (!session) return error(response, 401, '登录状态已失效，请重新开始。');
+      if (!session) return error(response, 401, '登录状态已失效，请重新开始 / Sign-in session expired. Start again.');
       const fingerprint = session.accountId.slice(session.accountId.lastIndexOf('.') + 1);
       const identity = await accounts.resolve(session.uuid, fingerprint, PORTAL_CLIENT_ID);
       if (!identity || verified.payload.sub !== identity.sub || scalar(verified.payload.nonce) !== loginState.nonce) {
-        return error(response, 401, '身份验证未通过，请重新开始。');
+        return error(response, 401, '身份验证未通过，请重新开始 / Identity verification failed. Start again.');
       }
       response.redirect(303, safeReturnPath(loginState.returnTo));
     } catch {
-      error(response, 503, '登录验证暂时不可用，请稍后重试。');
+      error(response, 503, '登录验证暂时不可用，请稍后重试 / Sign-in verification is temporarily unavailable. Try again later.');
     }
   });
 
@@ -258,7 +258,7 @@ export function createUserPortalRouter(
       const content = result.rows.length ? '<ul>' + list + '</ul>' : '<p>当前没有应用授权 / No applications are authorized.</p>';
       response.type('html').send(html('已授权的应用 / Authorizations', navigation + content));
     } catch {
-      error(response, 503, '授权记录暂时不可用。');
+      error(response, 503, '授权记录暂时不可用 / Authorization data is temporarily unavailable.');
     }
   });
 
