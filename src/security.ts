@@ -98,7 +98,76 @@ export function hashScryptPassword(password: string): string {
     maxmem: 64 * 1024 * 1024,
   }).toString('base64url');
 
-  return `scrypt${SCRYPT_N}${SCRYPT_R}${SCRYPT_P}${saltValue}${derived}`;
+  return ['scrypt', SCRYPT_N, SCRYPT_R, SCRYPT_P, saltValue, derived].join('
+}
+
+export function verifyScryptPassword(password: string, encodedHash: string): boolean {
+  if (typeof password !== 'string' || password.length > 1024 || typeof encodedHash !== 'string') {
+    return false;
+  }
+
+  const parts = encodedHash.split('$');
+  if (parts.length !== 6 || parts[0] !== 'scrypt') return false;
+
+  const n = Number(parts[1]);
+  const r = Number(parts[2]);
+  const p = Number(parts[3]);
+  const saltValue = parts[4];
+  const hashValue = parts[5];
+  if (
+    !Number.isSafeInteger(n) ||
+    n < 16_384 ||
+    n > 65_536 ||
+    (n & (n - 1)) !== 0 ||
+    !Number.isSafeInteger(r) ||
+    r !== 8 ||
+    !Number.isSafeInteger(p) ||
+    p < 1 ||
+    p > 4 ||
+    !saltValue ||
+    !hashValue ||
+    !/^[A-Za-z0-9_-]+$/.test(saltValue) ||
+    !/^[A-Za-z0-9_-]+$/.test(hashValue)
+  ) {
+    return false;
+  }
+
+  const salt = Buffer.from(saltValue, 'base64url');
+  const expected = Buffer.from(hashValue, 'base64url');
+  if (
+    salt.length !== 16 ||
+    expected.length !== SCRYPT_KEY_BYTES ||
+    salt.toString('base64url') !== saltValue ||
+    expected.toString('base64url') !== hashValue
+  ) {
+    return false;
+  }
+
+  try {
+    const actual = scryptSync(password, salt, expected.length, {
+      N: n,
+      r,
+      p,
+      maxmem: 128 * 1024 * 1024,
+    });
+    return timingSafeEqual(actual, expected);
+  } catch {
+    return false;
+  }
+}
+
+export function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      case "'": return '&#39;';
+      default: return character;
+    }
+  });
+});
 }
 
 export function verifyScryptPassword(password: string, encodedHash: string): boolean {
