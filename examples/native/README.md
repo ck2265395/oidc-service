@@ -4,7 +4,7 @@ This Expo development-build example uses the system browser, Authorization Code,
 
 ## Register a native application
 
-In the developer center, create a Native application and request openid, profile, and email. Register the exact callback URI printed by the app, normally org.dt.identitydemo://callback for an iOS or Android development build. Register dtidentitydemo://logout as a post-logout URI. Complete the required HTTPS homepage, privacy, and terms URLs, then submit the app for review.
+In the developer center, create a Native application and request openid, profile, and email. Register the exact callback URI printed by the app, normally org.dt.identitydemo://callback for an iOS or Android development build. Register org.dt.identitydemo://logout as a post-logout URI. Complete the required HTTPS homepage, privacy, and terms URLs, then submit the app for review.
 
 For production, use verified HTTPS app/universal links where supported and register the exact deployed URI.
 
