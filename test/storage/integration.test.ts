@@ -19,7 +19,7 @@ test('PostgreSQL repositories and Redis security controls work across connection
   skip: !databaseUrl || !redisUrl,
 }, async () => {
   const pool = createPlatformPool(databaseUrl!);
-  const redisA = createClient({ url: redisUrl! });
+  const redisA = createClient({ url: redisUrl });
   const redisB = createClient({ url: redisUrl! });
   const ownerUuid = randomUUID();
   const reviewerUuid = randomUUID();
