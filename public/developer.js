@@ -2,7 +2,7 @@ const API = '/api/v1/developer';
 const state = { csrf: '', language: 'zh', profileRevision: 0, profile: null, apps: [], groups: [], editing: null };
 const t = {
   zh: {
-    secure:'安全会话',eyebrow:'开发者工作区',title:'管理你的身份接入应用',intro:'维护开发者资料、提交应用审核，并查看当前审核状态。',
+    secure:'安全会话',signIn:'登录',eyebrow:'开发者工作区',title:'管理你的身份接入应用',intro:'维护开发者资料、提交应用审核，并查看当前审核状态。',
     accountEyebrow:'账户资料',profileTitle:'开发者资料',loading:'加载中',profileHelp:'联系邮箱仅用于联系，不代表已完成邮箱验证。',
     displayName:'开发者名称',contactEmail:'联系邮箱',saveProfile:'保存资料',catalogEyebrow:'应用',appsTitle:'我的应用',newApp:'新建应用',
     groupsEyebrow:'身份关联',groupsTitle:'应用组',groupsHelp:'同一所有者的应用组经审核后可用于关联应用身份。',
@@ -27,7 +27,7 @@ const t = {
     unknownError:'请求失败，请稍后重试。',verified:'已验证',unverified:'未验证',draft:'草稿',typeWeb:'Web · 服务端保密客户端',typeSpa:'SPA · 浏览器公开客户端',typeNative:'Native · 原生公开客户端'
   },
   en: {
-    secure:'Secure session',eyebrow:'DEVELOPER WORKSPACE',title:'Manage your identity applications',intro:'Maintain your developer profile, submit applications for review, and track their status.',
+    secure:'Secure session',signIn:'Sign in',eyebrow:'DEVELOPER WORKSPACE',title:'Manage your identity applications',intro:'Maintain your developer profile, submit applications for review, and track their status.',
     accountEyebrow:'ACCOUNT',profileTitle:'Developer profile',loading:'Loading',profileHelp:'The contact email is unverified until a separate verification flow is completed.',
     displayName:'Developer name',contactEmail:'Contact email',saveProfile:'Save profile',catalogEyebrow:'APPLICATIONS',appsTitle:'My applications',newApp:'New application',
     groupsEyebrow:'IDENTITY LINKING',groupsTitle:'Application groups',groupsHelp:'Approved groups can link application identities owned by the same developer.',
