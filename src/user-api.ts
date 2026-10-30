@@ -1,4 +1,4 @@
-import express, { Router } from 'express';
+import { Router } from 'express';
 import type Provider from 'oidc-provider';
 
 import { AccountService } from './accounts.js';
