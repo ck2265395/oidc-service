@@ -2,8 +2,45 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:http';
 
+import type { JWKS } from 'oidc-provider';
+
+import { AccountService, createAccountPool, PostgresAccountSource } from './accounts.js';
 import { createApplication } from './app.js';
+import { createOidcAdapterFactory } from './adapter.js';
 import { loadConfig } from './config.js';
+import { createProvider } from './provider.js';
+import { ApplicationService } from './platform.js';
+import { createPlatformPool, PostgresApplicationRepository } from './store.js';
+
+function record(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('Invalid protected key file');
+  }
+  return value as Record<string, unknown>;
+}
+
+async function readSigningKeys(): Promise<JWKS> {
+  const keyPath = process.env.OIDC_SIGNING_KEY_FILE;
+  if (!keyPath) throw new Error('OIDC_SIGNING_KEY_FILE must point to protected key material');
+
+  const root = record(JSON.parse(await readFile(keyPath, 'utf8')) as unknown);
+  const signing = record(root.signingKey);
+  const privateJwk = record(signing.privateJwk);
+  const kid = signing.kid;
+  if (
+    privateJwk.kty !== 'RSA' ||
+    typeof privateJwk.n !== 'string' ||
+    typeof privateJwk.d !== 'string' ||
+    typeof kid !== 'string' ||
+    kid.length < 16
+  ) {
+    throw new Error('Invalid protected signing key');
+  }
+
+  return {
+    keys: [{ ...privateJwk, kid, alg: 'RS256', use: 'sig' }],
+  } as JWKS;
+}
 
 export async function start(): Promise<void> {
   const configPath = process.env.OIDC_CONFIG_FILE;
@@ -13,31 +50,59 @@ export async function start(): Promise<void> {
 
   const rawConfig = JSON.parse(await readFile(configPath, 'utf8')) as unknown;
   const config = loadConfig(rawConfig);
-  const server = createServer(createApplication(config));
-
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(config.port, () => {
-      server.off('error', reject);
-      resolve();
-    });
+  const oidcPool = createPlatformPool(config.databases.oidc);
+  const accountPool = createAccountPool(config.databases.accounts);
+  const accountSource = new PostgresAccountSource(accountPool);
+  const applicationRepository = new PostgresApplicationRepository(oidcPool, config.mode === 'production' ? 'production' : 'development');
+  const applications = new ApplicationService(
+    applicationRepository,
+    config.mode === 'production' ? 'production' : 'development',
+  );
+  const accounts = new AccountService(accountSource, {
+    legacyHmacKey: config.secrets.legacyHmacKey,
+    fingerprintKey: config.secrets.fingerprint,
+    subjectKey: config.secrets.subject,
   });
+  const signingKeys = await readSigningKeys();
 
-  const shutdown = (): void => {
-    server.close((error) => {
-      if (error) {
-        process.exitCode = 1;
-      }
+  try {
+    await Promise.all([oidcPool.query('SELECT 1'), accountPool.query('SELECT 1')]);
+    const provider = createProvider(
+      config.issuer,
+      createOidcAdapterFactory(oidcPool, applications),
+      accounts,
+      applications,
+      config.secrets.cookie,
+      signingKeys,
+    );
+    const server = createServer(createApplication(config, provider));
+
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(config.port, () => {
+        server.off('error', reject);
+        resolve();
+      });
     });
-  };
-  process.once('SIGTERM', shutdown);
-  process.once('SIGINT', shutdown);
+
+    const shutdown = (): void => {
+      server.close((error) => {
+        void Promise.all([oidcPool.end(), accountPool.end()]).then(() => {
+          if (error) process.exitCode = 1;
+        });
+      });
+    };
+    process.once('SIGTERM', shutdown);
+    process.once('SIGINT', shutdown);
+  } catch (error) {
+    await Promise.allSettled([oidcPool.end(), accountPool.end()]);
+    throw error;
+  }
 }
 
 const invokedPath = process.argv[1];
 if (invokedPath && import.meta.url === pathToFileURL(invokedPath).href) {
   start().catch(() => {
-    // Do not print configuration values or nested driver errors.
     process.stderr.write('Service startup failed. Check the protected configuration and server logs.\n');
     process.exitCode = 1;
   });
