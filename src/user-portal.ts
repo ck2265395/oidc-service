@@ -1,12 +1,45 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import express, { type Request, type Response, Router } from 'express';
 import type Provider from 'oidc-provider';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { Pool } from 'pg';
 
 import { AccountService } from './accounts.js';
 import type { ServiceConfig } from './config.js';
 import { escapeHtml } from './security.js';
+import { PORTAL_CLIENT_ID } from './provider.js';
+
+interface PortalState {
+  verifier: string;
+  nonce: string;
+  returnTo: string;
+}
+
+interface PortalRedis {
+  set(key: string, value: string, options: { EX: number; NX: true }): Promise<string | null>;
+  eval(script: string, options: { keys: string[]; arguments: string[] }): Promise<unknown>;
+}
+
+const TAKE_PORTAL_STATE = "local value = redis.call('GET', KEYS[1]); if value then redis.call('DEL', KEYS[1]); end; return value";
+const PORTAL_STATE_TTL_SECONDS = 900;
+const PORTAL_JWKS = new WeakMap<Provider, ReturnType<typeof createRemoteJWKSet>>();
+
+function loginStateKey(state: string, secret: string): string {
+  return 'dt:portal:login:' + createHmac('sha256', secret).update(state, 'utf8').digest('hex');
+}
+
+function safeReturnPath(value: unknown): string {
+  return value === '/portal/authorizations' ? value : '/developer';
+}
+
+function portalJwks(provider: Provider, issuer: string): ReturnType<typeof createRemoteJWKSet> {
+  const existing = PORTAL_JWKS.get(provider);
+  if (existing) return existing;
+  const created = createRemoteJWKSet(new URL(issuer + '/jwks'));
+  PORTAL_JWKS.set(provider, created);
+  return created;
+}
 
 function scalar(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
@@ -44,6 +77,7 @@ export function createUserPortalRouter(
   provider: Provider,
   accounts: AccountService,
   config: ServiceConfig,
+  redis: PortalRedis,
 ): Router {
   const router = Router();
   router.use(express.urlencoded({ extended: false, limit: '8kb', parameterLimit: 10 }));
