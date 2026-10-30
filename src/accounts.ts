@@ -136,6 +136,7 @@ export class AccountService {
     identifier: LoginIdentifier,
     password: unknown,
     sector = 'default',
+    beforePasswordCheck?: (accountUuid: string | null) => Promise<void>,
   ): Promise<AccountIdentity | null> {
     if (
       !identifier ||
@@ -155,6 +156,7 @@ export class AccountService {
     }
 
     const matches = await this.source.lookup(identifier.type, identifier.value);
+    await beforePasswordCheck?.(matches.length === 1 ? matches[0]?.uuid ?? null : null);
     if (matches.length !== 1) return null;
 
     const account = matches[0];
