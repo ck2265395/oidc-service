@@ -114,7 +114,7 @@ function credentialFingerprint(uuid: string, digest: string, key: string): strin
     .digest('base64url');
 }
 
-function pairwiseSubject(uuid: string, sector: string, key: string): string {
+function subjectForSector(uuid: string, sector: string, key: string): string {
   return createHmac('sha256', key)
     .update(sector, 'utf8')
     .update('\0')
@@ -196,7 +196,7 @@ export class AccountService {
   private toIdentity(account: AccountRecord, sector: string): AccountIdentity {
     return {
       uuid: account.uuid,
-      sub: pairwiseSubject(account.uuid, sector, this.keys.subjectKey),
+      sub: subjectForSector(account.uuid, sector, this.keys.subjectKey),
       fingerprint: credentialFingerprint(account.uuid, account.password, this.keys.fingerprintKey),
       profile: {
         nickname: typeof account.nickname === 'string' ? account.nickname : null,
