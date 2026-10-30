@@ -23,7 +23,8 @@
     "jose": "6.2.13",
     "oidc-provider": "9.13.3",
     "pg": "8.23.1",
-    "redis": "6.3.0"
+    "redis": "6.3.0",
+    "nodemailer": "10.2.1"
   },
   "devDependencies": {
     "@types/express": "5.0.6",
