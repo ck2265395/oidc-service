@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "DT Identity Native Example",
+    "slug": "dt-identity-native-example",
+    "scheme": "dtidentitydemo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": { "bundleIdentifier": "org.dt.identitydemo" },
+    "android": { "package": "org.dt.identitydemo" }
+  }
+}
