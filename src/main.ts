@@ -14,6 +14,7 @@ import { createDeveloperRouter } from './developer.js';
 import { createAdminRouter } from './admin.js';
 import { createUserPortalRouter } from './user-portal.js';
 import { ApplicationService } from './platform.js';
+import { ApplicationGroupService } from './groups.js';
 import { createPlatformPool, PostgresApplicationRepository } from './store.js';
 
 function record(value: unknown): Record<string, unknown> {
@@ -65,6 +66,7 @@ export async function start(): Promise<void> {
     undefined,
     config.secrets.encryption,
   );
+  const groups = new ApplicationGroupService(applicationRepository);
   const accounts = new AccountService(accountSource, {
     legacyHmacKey: config.secrets.legacyHmacKey,
     fingerprintKey: config.secrets.fingerprint,
@@ -95,6 +97,7 @@ export async function start(): Promise<void> {
       provider,
       accounts,
       applications,
+      groups,
       config.issuer,
       config.issuer.startsWith('https:'),
     );
