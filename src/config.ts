@@ -25,6 +25,7 @@ export interface ServiceConfig {
   trustedProxyCidrs: string[];
   loginRateLimit: { windowSeconds: number; accountAttempts: number; ipAttempts: number };
   smtp: { host: string; port: number; secure: boolean; user: string | null; password: string | null; from: string } | null;
+  accountPortal: { registrationUrl: string | null; passwordResetUrl: string | null; profileUrl: string | null } | null;
 }
 
 export class ConfigError extends Error {
@@ -134,6 +135,22 @@ function trustedProxyCidrsAt(value: unknown): string[] {
   });
 }
 
+function accountPortalAt(value: unknown, mode: RuntimeMode): ServiceConfig['accountPortal'] {
+  if (value === undefined || value === null) return null;
+  const input = objectAt(value, 'accountPortal');
+  const url = (key: string): string | null => {
+    if (input[key] === undefined || input[key] === null || input[key] === '') return null;
+    const result = urlAt(input[key], 'accountPortal.' + key, ['https:', ...(mode === 'production' ? [] : ['http:'])]);
+    if (new URL(result).hash) throw new ConfigError('accountPortal.' + key + ' must not contain a fragment');
+    return result;
+  };
+  return {
+    registrationUrl: url('registrationUrl'),
+    passwordResetUrl: url('passwordResetUrl'),
+    profileUrl: url('profileUrl'),
+  };
+}
+
 function smtpConfigAt(value: unknown): ServiceConfig['smtp'] {
   if (value === undefined || value === null) return null;
   const input = objectAt(value, 'smtp');
@@ -226,5 +243,6 @@ export function loadConfig(input: unknown): ServiceConfig {
     trustedProxyCidrs: trustedProxyCidrsAt(root.trustedProxyCidrs),
     loginRateLimit: rateLimitConfigAt(root.loginRateLimit),
     smtp: smtpConfigAt(root.smtp),
+    accountPortal: accountPortalAt(root.accountPortal, mode),
   };
 }
