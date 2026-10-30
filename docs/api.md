@@ -37,7 +37,7 @@ Content-Type: application/json
 }
 ```
 
-Use the returned revision for subsequent profile updates. Contact email verification is not implemented; the API never marks an address verified.
+Use the returned revision for subsequent profile updates. To request verification, call `POST /api/v1/developer/profile/verification-email` with the same origin and CSRF headers. A one-time link expires after 30 minutes and is consumed by `GET /api/v1/developer/verify-email?token=...`. Resends are limited to one per account every five minutes. The address is marked verified only if it still matches the profile at confirmation time. SMTP must be configured; otherwise the request returns `503` and the profile remains unverified.
 
 ## Application groups
 
