@@ -161,7 +161,10 @@ export function validateApplicationDraft(
 
   let groupId: string | null = null;
   if (value.groupId !== null && value.groupId !== undefined) {
-    groupId = textAt(value.groupId, 'groupId', 128);
+    groupId = textAt(value.groupId, 'groupId', 36);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(groupId)) {
+      throw new ApplicationValidationError('groupId must be a valid group identifier');
+    }
   }
 
   return {
