@@ -76,7 +76,7 @@ test('requires HTTPS issuer in production', () => {
   input.mode = 'production';
   input.issuer = 'http://identity.example.test';
 
-  assert.throws(() => loadConfig(input), /HTTPS/);
+  assert.throws(() => loadConfig(input), /https/i);
 });
 
 test('rejects public or malformed database URLs', () => {
