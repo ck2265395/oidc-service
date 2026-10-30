@@ -12,7 +12,7 @@ This page records public-safe implementation status. Detailed product requiremen
 - Web client secrets encrypted with AES-GCM, returned once during creation, and rotated with revision checks. Provider client cache is cleared locally after review and rotation.
 - Upstream oidc-provider startup with persistent RS256 signing keys, S256 PKCE, authorization-code grants, and openid/profile/email scopes.
 - CSRF-protected login and consent interactions; consent shows the approved application purpose, developer, policy links, and human-readable requested data, plus a user authorization page with grant revocation.
-- Revisioned developer profile registration and owner-scoped APIs for application create/list/edit/submit/secret rotation and application-group create/list/rename.
+- Revisioned developer profile registration, owner-scoped application and group APIs, and an initial browser UI at `/developer` for profile maintenance, application drafts/review submission, secret rotation, and group requests/renames.
 - Administrator group approval, rejection, disablement, group history, and audit updates in one database transaction.
 - An independent administrator session with scrypt login, direct-peer-IP throttling, idle and absolute expiry, review queue, approve/reject/disable forms, audit view, and database status statistics.
 
@@ -20,7 +20,7 @@ This page records public-safe implementation status. Detailed product requiremen
 
 - No live PostgreSQL or Redis deployment has been connected. The GitHub CI suite validates types, lint, existing unit/HTTP tests, and build only.
 - Redis-backed cross-instance replay/session state and client-cache invalidation are incomplete. Disablement or key rotation across multiple service instances requires integration work.
-- Contact email verification and a complete server-rendered developer portal are incomplete; approved or disabled application groups cannot be renamed, and groups cannot be deleted.
+- Contact email verification, portal sign-in flow, and full usability/accessibility acceptance for the initial developer UI remain incomplete; approved or disabled application groups cannot be renamed, and groups cannot be deleted.
 - The administrator audit currently records application reviews and user grant revocations; other operational events and audit retention cleanup are incomplete.
 - Web/native relying-party examples, container packaging, deployment/upgrade guidance, and a complete protocol acceptance matrix remain incomplete.
 - This branch is for development. No production readiness or complete OIDC service is claimed.
