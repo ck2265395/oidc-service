@@ -1,0 +1,353 @@
+import { Pool, type PoolClient } from 'pg';
+
+import {
+  ApplicationValidationError,
+  validateApplicationDraft,
+  type ApplicationDraft,
+  type ClientType,
+  type RuntimeEnvironment,
+} from './applications.js';
+import {
+  ApplicationConflictError,
+  type ApplicationRecord,
+  type ApplicationStatus,
+  type ReviewRecord,
+} from './platform.js';
+
+export class PlatformStorageError extends Error {
+  constructor() {
+    super('Platform storage is unavailable');
+    this.name = 'PlatformStorageError';
+  }
+}
+
+export interface ApplicationPage {
+  total: number;
+  list: ApplicationRecord[];
+}
+
+export interface ApplicationRepository {
+  createApplication(record: ApplicationRecord): Promise<void>;
+  getApplication(id: string): Promise<ApplicationRecord | null>;
+  getOwnedApplication(id: string, ownerUuid: string): Promise<ApplicationRecord | null>;
+  getApplicationByClientId(clientId: string): Promise<ApplicationRecord | null>;
+  compareAndSwap(
+    previous: ApplicationRecord,
+    next: ApplicationRecord,
+    reviewEvent?: ReviewRecord | null,
+  ): Promise<boolean>;
+  listOwned(
+    ownerUuid: string,
+    page: number,
+    pageSize: number,
+    status?: ApplicationStatus,
+  ): Promise<ApplicationPage>;
+  close(): Promise<void>;
+}
+
+interface ApplicationRow {
+  id: string;
+  owner_account_uuid: string;
+  client_id: string;
+  client_type: string;
+  revision: string | number;
+  status: string;
+  draft_config: unknown;
+  approved_config: unknown | null;
+  approved_revision: string | number | null;
+  group_id: string | null;
+  last_review: unknown | null;
+}
+
+const APPLICATION_COLUMNS =
+  'id, owner_account_uuid, client_id, client_type, revision, status, draft_config, approved_config, approved_revision, group_id, last_review';
+
+function parseJson(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    throw new PlatformStorageError();
+  }
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  const parsed = parseJson(value);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new PlatformStorageError();
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function parseStatus(value: string): ApplicationStatus {
+  if (['draft', 'pending', 'rejected', 'approved', 'disabled'].includes(value)) {
+    return value as ApplicationStatus;
+  }
+  throw new PlatformStorageError();
+}
+
+function parseClientType(value: string): ClientType {
+  if (['web', 'spa', 'native'].includes(value)) return value as ClientType;
+  throw new PlatformStorageError();
+}
+
+function parseReview(value: unknown): ReviewRecord | null {
+  if (value === null) return null;
+  const review = recordValue(value);
+  if (
+    !['approve', 'reject', 'disable'].includes(String(review.action)) ||
+    typeof review.reviewerUuid !== 'string' ||
+    typeof review.revision !== 'number' ||
+    typeof review.reviewedAt !== 'string' ||
+    (review.reason !== null && typeof review.reason !== 'string')
+  ) {
+    throw new PlatformStorageError();
+  }
+  return {
+    action: review.action as ReviewRecord['action'],
+    reviewerUuid: review.reviewerUuid,
+    reason: review.reason as string | null,
+    revision: review.revision,
+    reviewedAt: review.reviewedAt,
+  };
+}
+
+function mapApplicationRow(row: ApplicationRow, environment: RuntimeEnvironment): ApplicationRecord {
+  const type = parseClientType(row.client_type);
+  let draft: ApplicationDraft;
+  try {
+    draft = validateApplicationDraft(row.draft_config, type, environment);
+  } catch {
+    throw new PlatformStorageError();
+  }
+
+  let approvedConfig: ApplicationDraft | null = null;
+  if (row.approved_config !== null) {
+    try {
+      approvedConfig = validateApplicationDraft(row.approved_config, type, environment);
+    } catch {
+      throw new PlatformStorageError();
+    }
+  }
+
+  const revision = Number(row.revision);
+  const approvedRevision = row.approved_revision === null ? null : Number(row.approved_revision);
+  const status = parseStatus(row.status);
+  const lastReview = parseReview(row.last_review);
+  if (
+    !row.id ||
+    !row.owner_account_uuid ||
+    !row.client_id ||
+    !Number.isSafeInteger(revision) ||
+    revision < 1 ||
+    (approvedRevision !== null && (!Number.isSafeInteger(approvedRevision) || approvedRevision < 1)) ||
+    (approvedConfig === null) !== (approvedRevision === null)
+  ) {
+    throw new PlatformStorageError();
+  }
+  if ((draft.groupId ?? null)?.toLowerCase() !== (row.group_id ?? null)?.toLowerCase()) {
+    throw new PlatformStorageError();
+  }
+
+  return {
+    id: row.id,
+    ownerUuid: row.owner_account_uuid,
+    clientId: row.client_id,
+    type,
+    revision,
+    draft,
+    approvedConfig,
+    approvedRevision,
+    status,
+    disabledReason: status === 'disabled' ? lastReview?.reason ?? null : null,
+    lastReview,
+  };
+}
+
+export function createPlatformPool(connectionString: string): Pool {
+  return new Pool({
+    connectionString,
+    max: 10,
+    connectionTimeoutMillis: 5_000,
+    idleTimeoutMillis: 30_000,
+    statement_timeout: 10_000,
+    application_name: 'dt-identity-service',
+  });
+}
+
+export class PostgresApplicationRepository implements ApplicationRepository {
+  constructor(
+    private readonly pool: Pool,
+    private readonly environment: RuntimeEnvironment,
+  ) {}
+
+  async createApplication(record: ApplicationRecord): Promise<void> {
+    try {
+      await this.pool.query(
+        'INSERT INTO oidc_application (id, owner_account_uuid, client_id, client_type, revision, status, draft_config, approved_config, approved_revision, group_id, last_review) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11::jsonb)',
+        [
+          record.id,
+          record.ownerUuid,
+          record.clientId,
+          record.type,
+          record.revision,
+          record.status,
+          JSON.stringify(record.draft),
+          record.approvedConfig === null ? null : JSON.stringify(record.approvedConfig),
+          record.approvedRevision,
+          record.draft.groupId,
+          record.lastReview === null ? null : JSON.stringify(record.lastReview),
+        ],
+      );
+    } catch {
+      throw new PlatformStorageError();
+    }
+  }
+
+  async getApplication(id: string): Promise<ApplicationRecord | null> {
+    return this.fetchOne(
+      'SELECT ' + APPLICATION_COLUMNS + ' FROM oidc_application WHERE id = $1 LIMIT 1',
+      [id],
+    );
+  }
+
+  async getOwnedApplication(id: string, ownerUuid: string): Promise<ApplicationRecord | null> {
+    return this.fetchOne(
+      'SELECT ' + APPLICATION_COLUMNS + ' FROM oidc_application WHERE id = $1 AND owner_account_uuid = $2 LIMIT 1',
+      [id, ownerUuid],
+    );
+  }
+
+  async getApplicationByClientId(clientId: string): Promise<ApplicationRecord | null> {
+    return this.fetchOne(
+      'SELECT ' + APPLICATION_COLUMNS + ' FROM oidc_application WHERE client_id = $1 LIMIT 1',
+      [clientId],
+    );
+  }
+
+  async compareAndSwap(
+    previous: ApplicationRecord,
+    next: ApplicationRecord,
+    reviewEvent: ReviewRecord | null = null,
+  ): Promise<boolean> {
+    const connection = await this.pool.connect();
+    try {
+      await connection.query('BEGIN');
+      const update = await connection.query(
+        'UPDATE oidc_application SET revision = $1, status = $2, draft_config = $3::jsonb, approved_config = $4::jsonb, approved_revision = $5, group_id = $6, last_review = $7::jsonb, updated_at = now() WHERE id = $8 AND owner_account_uuid = $9 AND revision = $10 AND status = $11',
+        [
+          next.revision,
+          next.status,
+          JSON.stringify(next.draft),
+          next.approvedConfig === null ? null : JSON.stringify(next.approvedConfig),
+          next.approvedRevision,
+          next.draft.groupId,
+          next.lastReview === null ? null : JSON.stringify(next.lastReview),
+          previous.id,
+          previous.ownerUuid,
+          previous.revision,
+          previous.status,
+        ],
+      );
+
+      if (update.rowCount !== 1) {
+        await connection.query('ROLLBACK');
+        return false;
+      }
+
+      if (reviewEvent) {
+        await this.insertReviewHistory(connection, previous, next, reviewEvent);
+      }
+      await connection.query('COMMIT');
+      return true;
+    } catch {
+      await this.rollbackQuietly(connection);
+      throw new PlatformStorageError();
+    } finally {
+      connection.release();
+    }
+  }
+
+  async listOwned(
+    ownerUuid: string,
+    page: number,
+    pageSize: number,
+    status?: ApplicationStatus,
+  ): Promise<ApplicationPage> {
+    if (
+      !Number.isSafeInteger(page) ||
+      page < 1 ||
+      !Number.isSafeInteger(pageSize) ||
+      pageSize < 1 ||
+      pageSize > 100
+    ) {
+      throw new ApplicationConflictError('Invalid pagination');
+    }
+
+    const offset = (page - 1) * pageSize;
+    if (!Number.isSafeInteger(offset)) throw new ApplicationConflictError('Invalid pagination');
+
+    try {
+      const count = await this.pool.query<{ count: string }>(
+        'SELECT count(*)::text AS count FROM oidc_application WHERE owner_account_uuid = $1 AND ($2::text IS NULL OR status = $2)',
+        [ownerUuid, status ?? null],
+      );
+      const rows = await this.pool.query<ApplicationRow>(
+        'SELECT ' + APPLICATION_COLUMNS + ' FROM oidc_application WHERE owner_account_uuid = $1 AND ($4::text IS NULL OR status = $4) ORDER BY updated_at DESC, id DESC LIMIT $2 OFFSET $3',
+        [ownerUuid, pageSize, offset, status ?? null],
+      );
+      return {
+        total: Number(count.rows[0]?.count ?? '0'),
+        list: rows.rows.map((row) => mapApplicationRow(row, this.environment)),
+      };
+    } catch (error) {
+      if (error instanceof ApplicationConflictError || error instanceof PlatformStorageError) throw error;
+      throw new PlatformStorageError();
+    }
+  }
+
+  async close(): Promise<void> {
+    await this.pool.end();
+  }
+
+  private async fetchOne(query: string, values: unknown[]): Promise<ApplicationRecord | null> {
+    try {
+      const result = await this.pool.query<ApplicationRow>(query, values);
+      const row = result.rows[0];
+      return row ? mapApplicationRow(row, this.environment) : null;
+    } catch (error) {
+      if (error instanceof PlatformStorageError) throw error;
+      throw new PlatformStorageError();
+    }
+  }
+
+  private async insertReviewHistory(
+    connection: PoolClient,
+    previous: ApplicationRecord,
+    next: ApplicationRecord,
+    review: ReviewRecord,
+  ): Promise<void> {
+    await connection.query(
+      'INSERT INTO application_review_history (application_id, revision, submitted_by_account_uuid, reviewed_by_account_uuid, decision, reason, submitted_config, previously_approved_config, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9)',
+      [
+        next.id,
+        review.revision,
+        next.ownerUuid,
+        review.reviewerUuid,
+        review.action,
+        review.reason,
+        JSON.stringify(next.draft),
+        previous.approvedConfig === null ? null : JSON.stringify(previous.approvedConfig),
+        review.reviewedAt,
+      ],
+    );
+  }
+
+  private async rollbackQuietly(connection: PoolClient): Promise<void> {
+    try {
+      await connection.query('ROLLBACK');
+    } catch {
+      // Keep storage errors generic and avoid logging driver details.
+    }
+  }
+}
