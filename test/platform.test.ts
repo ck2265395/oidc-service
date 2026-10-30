@@ -118,6 +118,7 @@ test('stale revisions and reviews without reasons are rejected', () => {
 class MemoryRepository implements ApplicationRepository {
   readonly records = new Map<string, import('../src/platform.js').ApplicationRecord>();
   readonly groups = new Set<string>();
+  readonly approvedGroups = new Set<string>();
 
   async createApplication(record: import('../src/platform.js').ApplicationRecord): Promise<void> {
     this.records.set(record.id, record);
@@ -141,7 +142,7 @@ class MemoryRepository implements ApplicationRepository {
   }
 
   async groupApprovedBy(ownerUuid: string, groupId: string) {
-    return this.groups.has(ownerUuid + ':' + groupId);
+    return this.approvedGroups.has(ownerUuid + ':' + groupId);
   }
 
   async compareAndSwap(previous: import('../src/platform.js').ApplicationRecord, next: import('../src/platform.js').ApplicationRecord) {
@@ -192,4 +193,22 @@ test('application service refuses groups owned by another account', async () => 
     service.create('owner-a', 'web', validDraft('Grouped', groupId)),
     ApplicationConflictError,
   );
+});
+
+test('shared subjects wait for both application and group approval', async () => {
+  const repository = new MemoryRepository();
+  const service = new ApplicationService(repository, 'production', () => 'grouped-app', () => 'grouped-client');
+  const ownerUuid = 'owner-a';
+  const groupId = 'a23e4567-e89b-42d3-a456-426614174000';
+  repository.groups.add(ownerUuid + ':' + groupId);
+
+  const created = await service.create(ownerUuid, 'web', validDraft('Grouped', groupId));
+  const pending = await service.submit(created.id, ownerUuid, created.revision);
+  assert.ok(pending);
+  await service.review(created.id, pending.revision, { action: 'approve', reviewerUuid: 'admin-a' });
+
+  assert.equal((await service.activeClient(created.clientId))?.config.groupId, null);
+
+  repository.approvedGroups.add(ownerUuid + ':' + groupId);
+  assert.equal((await service.activeClient(created.clientId))?.config.groupId, groupId);
 });
