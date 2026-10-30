@@ -103,6 +103,7 @@ export function createInteractionRouter(
   csrfKey: string,
   secureCookies: boolean,
   rateLimiter: RedisLoginRateLimiter,
+  accountPortal: { registrationUrl: string | null; passwordResetUrl: string | null; profileUrl: string | null } | null = null,
 ): Router {
   const router = Router();
   router.use(express.urlencoded({ extended: false, limit: '16kb', parameterLimit: 20 }));
@@ -127,8 +128,12 @@ export function createInteractionRouter(
           '<option value="username">用户名</option><option value="email">邮箱</option></select>' +
           '<label for="identifier">用户名或邮箱</label><input id="identifier" name="identifier" required maxlength="254" autocomplete="username">' +
           '<label for="password">密码</label><input id="password" type="password" name="password" required maxlength="1024" autocomplete="current-password">' +
-          '<button type="submit">登录并继续</button></form>';
-        return response.type('html').send(page('登录', form));
+          '<button type="submit">登录并继续 / Sign in and continue</button></form>' +
+          '<nav aria-label="账号管理">' +
+          (accountPortal?.registrationUrl ? '<a href="' + escapeHtml(accountPortal.registrationUrl) + '" target="_blank" rel="noopener noreferrer">注册账号 / Register</a> ' : '') +
+          (accountPortal?.passwordResetUrl ? '<a href="' + escapeHtml(accountPortal.passwordResetUrl) + '" target="_blank" rel="noopener noreferrer">忘记密码 / Reset password</a> ' : '') +
+          '</nav>';
+        return response.type('html').send(page('登录 / Sign in', form));
       }
 
       if (details.prompt.name === 'consent') {
