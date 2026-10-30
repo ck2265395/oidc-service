@@ -26,6 +26,7 @@ export interface ApplicationGroupPage {
 
 export interface ApplicationGroupRepository {
   createGroup(record: ApplicationGroupRecord): Promise<void>;
+  renameGroup(previous: ApplicationGroupRecord, next: ApplicationGroupRecord): Promise<boolean>;
   getOwnedGroup(id: string, ownerUuid: string): Promise<ApplicationGroupRecord | null>;
   getGroup(id: string): Promise<ApplicationGroupRecord | null>;
   listOwnedGroups(ownerUuid: string, page: number, pageSize: number): Promise<ApplicationGroupPage>;
@@ -66,6 +67,40 @@ export class ApplicationGroupService {
     };
     await this.repository.createGroup(record);
     return record;
+  }
+
+  async rename(
+    id: string,
+    ownerUuid: string,
+    expectedRevision: number,
+    displayName: unknown,
+  ): Promise<ApplicationGroupRecord | null> {
+    const record = await this.repository.getOwnedGroup(id, ownerUuid);
+    if (!record) return null;
+    if (!Number.isSafeInteger(expectedRevision) || record.revision !== expectedRevision) {
+      throw new ApplicationGroupError();
+    }
+    if (!['pending', 'rejected'].includes(record.status)) {
+      throw new ApplicationGroupError('Only pending or rejected groups can be renamed');
+    }
+    if (
+      typeof displayName !== 'string' ||
+      displayName.trim() !== displayName ||
+      displayName.length < 1 ||
+      displayName.length > 100
+    ) {
+      throw new ApplicationGroupError('Group name must contain 1 to 100 characters');
+    }
+    if (record.revision >= Number.MAX_SAFE_INTEGER) throw new ApplicationGroupError();
+    const next: ApplicationGroupRecord = {
+      ...record,
+      displayName,
+      status: 'pending',
+      revision: record.revision + 1,
+      lastReview: null,
+    };
+    if (!await this.repository.renameGroup(record, next)) throw new ApplicationGroupError();
+    return next;
   }
 
   async getForAdmin(id: string): Promise<ApplicationGroupRecord | null> {
