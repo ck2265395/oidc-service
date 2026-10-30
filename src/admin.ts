@@ -295,17 +295,22 @@ export function createAdminRouter(
     const pageText = typeof request.query.page === 'string' ? request.query.page : '1';
     const page = /^[1-9][0-9]*$/.test(pageText) ? Number(pageText) : Number.NaN;
     const appText = request.query.applicationId;
-    const appId = appText === undefined ? null : scalar(appText);
+    const appId = appText === undefined || appText === '' ? null : scalar(appText);
     const outcomeText = request.query.outcome;
     const outcome = outcomeText === undefined || outcomeText === '' ? null : scalar(outcomeText);
     const actionText = request.query.action;
     const action = actionText === undefined || actionText === '' ? null : scalar(actionText);
-    const fromText = request.query.from === undefined || request.query.from === '' ? null : scalar(request.query.from);
-    const toText = request.query.to === undefined || request.query.to === '' ? null : scalar(request.query.to);
+    const fromRaw = request.query.from;
+    const toRaw = request.query.to;
+    const fromText = fromRaw === undefined || fromRaw === '' ? null : scalar(fromRaw);
+    const toText = toRaw === undefined || toRaw === '' ? null : scalar(toRaw);
+    const invalidScalarFilter = [appText, outcomeText, actionText, fromRaw, toRaw].some((value) =>
+      value !== undefined && value !== '' && typeof value !== 'string',
+    );
     const validDate = (value: string | null): boolean =>
-      value === null || (/^\\d{4}-\\d{2}-\\d{2}$/.test(value) && !Number.isNaN(Date.parse(value + 'T00:00:00.000Z')));
+      value === null || (/^\\d{4}-\\d{2}-\\d{2}$/.test(value) && !Number.isNaN(Date.parse(value + 'T00:00:00.000Z')) && new Date(value + 'T00:00:00.000Z').toISOString().slice(0, 10) === value);
     if (
-      !Number.isSafeInteger(page) || page < 1 || page > 10000 ||
+      invalidScalarFilter || !Number.isSafeInteger(page) || page < 1 || page > 10000 ||
       (appId !== null && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(appId)) ||
       (outcome !== null && !['success', 'denied', 'failure'].includes(outcome)) ||
       (action !== null && (action.length > 120 || !/^[a-z0-9_.-]+$/i.test(action))) ||
