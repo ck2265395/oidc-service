@@ -61,7 +61,8 @@ function setLanguage(language){
   document.querySelector('#language-toggle').textContent=language==='zh'?'EN':'中文';
   document.querySelector('#sign-in-link').textContent=tr('signIn');
 }
-function showSignInEntry(){document.querySelector('#sign-in-link').hidden=false;document.querySelector('#secure-label').hidden=true}\nfunction notice(message,kind='success'){
+function showSignInEntry(){document.querySelector('#sign-in-link').hidden=false;document.querySelector('#secure-label').hidden=true}
+function notice(message,kind='success'){
   const el=document.querySelector('#notice');el.textContent=message;el.className='notice notice-'+kind;el.hidden=false;
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -140,8 +141,10 @@ function showEditor(app=null){
   if(draft){
     for(const key of ['name','description','purpose','homepageUrl','privacyUrl','termsUrl'])form.elements[key].value=draft[key]||'';
     form.elements.iconUrl.value=draft.iconUrl||'';
-    form.elements.redirectUris.value=draft.redirectUris.join('\n');
-    form.elements.postLogoutRedirectUris.value=draft.postLogoutRedirectUris.join('\n');
+    form.elements.redirectUris.value=draft.redirectUris.join('
+');
+    form.elements.postLogoutRedirectUris.value=draft.postLogoutRedirectUris.join('
+');
     form.elements.groupId.value=draft.groupId||'';
     form.elements.scopeProfile.checked=draft.scopes.includes('profile');
     form.elements.scopeEmail.checked=draft.scopes.includes('email');
@@ -150,7 +153,8 @@ function showEditor(app=null){
 }
 function readDraft(form){
   const data=new FormData(form);
-  const lines=name=>String(data.get(name)||'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
+  const lines=name=>String(data.get(name)||'').split(/\r?
+/).map(value=>value.trim()).filter(Boolean);
   return {
     name:String(data.get('name')||''),description:String(data.get('description')||''),purpose:String(data.get('purpose')||''),
     homepageUrl:String(data.get('homepageUrl')||''),privacyUrl:String(data.get('privacyUrl')||''),termsUrl:String(data.get('termsUrl')||''),
