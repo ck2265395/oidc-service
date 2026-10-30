@@ -24,7 +24,7 @@ async function migrate(): Promise<void> {
 
     const directory = resolve(process.cwd(), 'sql/migrations');
     const names = (await readdir(directory))
-      .filter((name) => /^\\d{3,}_[a-z0-9_-]+\\.sql$/.test(name))
+      .filter((name) => /^\d{3,}_[a-z0-9_-]+\.sql$/.test(name))
       .sort();
     if (names.length === 0) throw new Error('No schema migrations are available');
 
@@ -65,8 +65,8 @@ async function migrate(): Promise<void> {
 }
 
 migrate().then(() => {
-  process.stdout.write('Database migrations are up to date.\\n');
+  process.stdout.write('Database migrations are up to date.\n');
 }).catch(() => {
-  process.stderr.write('Database migration failed. Check protected configuration and migration files.\\n');
+  process.stderr.write('Database migration failed. Check protected configuration and migration files.\n');
   process.exitCode = 1;
 });
