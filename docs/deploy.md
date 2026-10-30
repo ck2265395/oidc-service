@@ -9,6 +9,12 @@
 
 The account database is never migrated or written by this service. Configure its existing schema and a database role that has only the required SELECT privileges.
 
+## SMTP email verification
+
+The developer contact-email verification workflow is enabled only when the protected configuration contains an `smtp` object. The example configuration uses `null`, which leaves email verification unavailable and never marks an address verified.
+
+Configure `host`, `port`, `secure`, and `from`; set `user` and `password` together when the relay requires authentication. Keep the password in the protected runtime configuration or secret manager. With `secure: false`, the transport requires STARTTLS and TLS 1.2 or newer. Verify relay reachability and sender authorization in the target environment before enabling the workflow. Verification messages contain a single-use link that expires after 30 minutes; requests are limited per account.
+
 ## Container deployment
 
 1. Copy `config.example.json` to `runtime/config.json`, set `port` to `3000`, and replace every placeholder with actual protected values. Set the OIDC database URL to `oidc-db` and Redis URL to `redis` for the Compose network. Configure the account database URL using a host reachable from the container.
