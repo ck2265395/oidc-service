@@ -20,9 +20,9 @@ This page records public-safe implementation status. Detailed product requiremen
 
 - No live PostgreSQL or Redis deployment has been connected. Redis rate-limit and replay-detection behavior have unit coverage, while database roles, full protocol persistence, and multi-instance behavior still need live integration tests.
 - Protocol documents still use PostgreSQL; Redis pub/sub now distributes client-cache invalidations, and atomic replay detection, login throttling, and portal login transactions use Redis. Login counters hash resolved account identifiers (or submitted identifiers when lookup is ambiguous) and source addresses resolved through explicitly trusted proxy ranges. Live Redis/proxy integration and missed-notification recovery remain unverified.
-- Contact email verification, full usability/accessibility acceptance for the initial developer UI remains incomplete; approved or disabled application groups cannot be renamed, and groups cannot be deleted.
+- Contact email verification and full usability/accessibility acceptance for the initial developer UI remain incomplete; approved or disabled application groups cannot be renamed, and groups cannot be deleted.
 - The administrator audit currently records application reviews and user grant revocations; other operational events and audit retention cleanup are incomplete.
-- Runnable Web and Native relying-party examples, a Dockerfile, and a Compose stack for the service, PostgreSQL, and Redis are provided; the existing account database remains an external read-only dependency. Production-grade schema migration/upgrade automation, example app-device verification, target-environment acceptance, and a complete protocol acceptance matrix remain incomplete.
+- Runnable Web and Native relying-party examples, a Dockerfile, and a Compose stack for the service, PostgreSQL, and Redis are provided; the existing account database remains an external read-only dependency. Production-grade schema migration/upgrade automation, real-device testing of the examples, target-environment acceptance, and a complete protocol acceptance matrix remain incomplete.
 - This branch is for development. No production readiness or complete OIDC service is claimed.
 
 The detailed internal requirements were not copied to this public repository.
