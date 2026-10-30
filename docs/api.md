@@ -14,7 +14,8 @@ All application APIs require an active OIDC provider session. Successful respons
 
 Errors use the same shape with a stable nonzero code and an appropriate HTTP status. Responses include no-store headers.
 
-## Current user profile\n\n- `GET /api/v1/me` requires the current identity-service session and rechecks account status and credential version. It returns only nickname, masked email, and a safe HTTPS picture URL when available; it never returns internal account identifiers. Relative picture paths are omitted unless `profilePictureBaseUrl` is configured.\n\n## Developer profile
+## Current user profile
+\n- `GET /api/v1/me` requires the current identity-service session and rechecks account status and credential version. It returns only nickname, masked email, and a safe HTTPS picture URL when available; it never returns internal account identifiers. Relative picture paths are omitted unless `profilePictureBaseUrl` is configured.\n\n## Developer profile
 
 First request a CSRF token:
 
