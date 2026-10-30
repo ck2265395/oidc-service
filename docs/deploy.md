@@ -29,7 +29,7 @@ docker compose ps
 docker compose logs -f identity
 ```
 
-The Compose PostgreSQL initialization runs `sql/postgre.sql` only when the data volume is first created. For existing volumes, apply reviewed schema changes through a controlled migration process; do not delete a volume to force initialization.
+The Compose PostgreSQL initialization runs `sql/postgre.sql` only when the data volume is first created. Before the identity service starts, its migration command applies unapplied files in `sql/migrations/` under a PostgreSQL advisory lock. Each migration runs in a transaction and is recorded with a SHA-256 checksum; changing an already applied migration stops startup. For manual deployments, run `npm run build && npm run migrate` before `npm start`. Back up the database and review each new migration before deployment; do not delete a volume to force initialization.
 
 ## Health and operations
 
