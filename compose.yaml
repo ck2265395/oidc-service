@@ -1,0 +1,57 @@
+services:
+  oidc-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: oidc
+      POSTGRES_USER: oidc_user
+      POSTGRES_PASSWORD: ${OIDC_DB_PASSWORD:?set OIDC_DB_PASSWORD in the environment}
+    volumes:
+      - oidc-data:/var/lib/postgresql/data
+      - ./sql/postgre.sql:/docker-entrypoint-initdb.d/001-platform.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oidc_user -d oidc"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--protected-mode", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  identity:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      OIDC_CONFIG_FILE: /run/identity/config.json
+      OIDC_SIGNING_KEY_FILE: /run/identity/signing.json
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./runtime/config.json:/run/identity/config.json:ro
+      - ./runtime/signing.json:/run/identity/signing.json:ro
+    depends_on:
+      oidc-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  oidc-data:
+  redis-data:
