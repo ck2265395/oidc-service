@@ -101,7 +101,7 @@ export function createUserPortalRouter(
         created_at: Date;
         name: string | null;
       }>(
-        "SELECT d.document_id, d.client_id, d.payload->>'scope' AS scope, d.created_at, a.draft_config->>'name' AS name FROM oidc_document d LEFT JOIN oidc_application a ON a.client_id = d.client_id WHERE d.model = 'Grant' AND d.payload->>'accountId' = $1 ORDER BY d.created_at DESC, d.document_id LIMIT 100",
+        "SELECT d.document_id, d.client_id, coalesce(d.payload->>'scope', d.payload->'openid'->>'scope') AS scope, d.created_at, coalesce(a.approved_config->>'name', a.draft_config->>'name') AS name FROM oidc_document d LEFT JOIN oidc_application a ON a.client_id = d.client_id AND a.status = 'approved' WHERE d.model = 'Grant' AND d.payload->>'accountId' = $1 ORDER BY d.created_at DESC, d.document_id LIMIT 100",
         [session.accountId],
       );
       const csrf = csrfToken(response);
