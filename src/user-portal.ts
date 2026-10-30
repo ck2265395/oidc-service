@@ -240,23 +240,55 @@ export function createUserPortalRouter(
         scope: string | null;
         created_at: Date;
         name: string | null;
+        status: string | null;
       }>(
-        "SELECT d.document_id, d.client_id, coalesce(d.payload->>'scope', d.payload->'openid'->>'scope') AS scope, d.created_at, coalesce(a.approved_config->>'name', a.draft_config->>'name') AS name FROM oidc_document d LEFT JOIN oidc_application a ON a.client_id = d.client_id AND a.status = 'approved' WHERE d.model = 'Grant' AND d.payload->>'accountId' = $1 AND (d.expires_at IS NULL OR d.expires_at > now()) ORDER BY d.created_at DESC, d.document_id LIMIT 100",
+        "SELECT d.document_id, d.client_id, coalesce(d.payload->>'scope', d.payload->'openid'->>'scope') AS scope, d.created_at, coalesce(a.approved_config->>'name', a.draft_config->>'name') AS name, a.status FROM oidc_document d LEFT JOIN oidc_application a ON a.client_id = d.client_id AND a.status = 'approved' WHERE d.model = 'Grant' AND d.payload->>'accountId' = $1 AND (d.expires_at IS NULL OR d.expires_at > now()) ORDER BY d.created_at DESC, d.document_id LIMIT 100",
         [session.accountId],
       );
       const csrf = csrfToken(response);
       const navigation = '<nav><a href="/portal/profile">个人资料 / Profile</a> · <a href="/portal/authorizations">应用授权 / Authorizations</a></nav>';
       const list = result.rows.map((row) => {
         const name = row.name ?? row.client_id ?? '未知应用';
-        return '<li><strong>' + escapeHtml(name) + '</strong><p>权限：' +
-          escapeHtml(row.scope ?? 'openid') + '</p><form method="post" action="/authorizations/' +
-          encodeURIComponent(row.document_id) + '/revoke"><input type="hidden" name="csrf" value="' +
-          escapeHtml(csrf) + '"><button type="submit">撤销授权</button></form></li>';
+        const status = row.status === 'approved' ? '可用 / Active' : row.status ? '不可用 / Unavailable' : '平台门户 / Platform portal';
+        return '<li><strong>' + escapeHtml(name) + '</strong><p>权限 / Permissions: ' +
+          escapeHtml(row.scope ?? 'openid') + '</p><p>状态 / Status: ' + escapeHtml(status) +
+          ' · 授权时间 / Authorized: ' + escapeHtml(new Date(row.created_at).toISOString()) +
+          '</p><a href="/authorizations/' + encodeURIComponent(row.document_id) + '/confirm-revoke">撤销授权 / Revoke</a></li>';
       }).join('');
       const content = result.rows.length ? '<ul>' + list + '</ul>' : '<p>当前没有应用授权。</p>';
       response.type('html').send(html('已授权的应用 / Authorizations', navigation + content));
     } catch {
       error(response, 503, '授权记录暂时不可用。');
+    }
+  });
+
+  router.get('/authorizations/:id/confirm-revoke', async (request, response) => {
+    const session = await currentSession(request, response);
+    if (!session) return response.redirect(303, '/portal/sign-in?return=%2Fportal%2Fauthorizations');
+    const grantId = request.params.id;
+    if (!grantId || grantId.length > 128) return error(response, 404, '授权记录不存在 / Authorization not found.');
+    try {
+      const result = await pool.query<{ scope: string | null; created_at: Date; name: string | null }>(
+        "SELECT coalesce(d.payload->>'scope', d.payload->'openid'->>'scope') AS scope, d.created_at, " +
+        "coalesce(a.approved_config->>'name', a.draft_config->>'name', d.client_id) AS name " +
+        "FROM oidc_document d LEFT JOIN oidc_application a ON a.client_id = d.client_id " +
+        "WHERE d.model = 'Grant' AND d.document_id = $1 AND d.payload->>'accountId' = $2 " +
+        "AND (d.expires_at IS NULL OR d.expires_at > now()) LIMIT 1",
+        [grantId, session.accountId],
+      );
+      const row = result.rows[0];
+      if (!row) return error(response, 404, '授权记录不存在 / Authorization not found.');
+      const csrf = csrfToken(response);
+      const content = '<p><strong>' + escapeHtml(row.name ?? '应用 / Application') +
+        '</strong> 将无法继续使用此平台授权。此操作不会删除该应用中的本地账号或会话。 / The application will lose access to this grant. Its local account and session are not deleted.</p>' +
+        '<p>权限 / Permissions: ' + escapeHtml(row.scope ?? 'openid') + '</p>' +
+        '<form method="post" action="/authorizations/' + encodeURIComponent(grantId) + '/revoke">' +
+        '<input type="hidden" name="csrf" value="' + escapeHtml(csrf) + '">' +
+        '<button type="submit">确认撤销 / Confirm revocation</button></form>' +
+        '<p><a href="/authorizations">返回 / Back</a></p>';
+      response.type('html').send(html('确认撤销授权 / Confirm authorization revocation', content));
+    } catch {
+      error(response, 503, '授权记录暂时不可用 / Authorization data is unavailable.');
     }
   });
 
