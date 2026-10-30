@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
 
 import express, { type ErrorRequestHandler, type Express, type Router } from 'express';
 import type Provider from 'oidc-provider';
@@ -14,6 +15,7 @@ export function createApplication(
   userPortal?: Router,
 ): Express {
   const app = express();
+  const publicDirectory = resolve(process.cwd(), 'public');
 
   app.disable('x-powered-by');
   app.use((_request, response, next) => {
@@ -24,11 +26,16 @@ export function createApplication(
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('X-Frame-Options', 'DENY');
     response.setHeader('Referrer-Policy', 'no-referrer');
-    response.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
+    response.setHeader('Content-Security-Policy', "default-src 'none'; connect-src 'self'; img-src 'self' https:; script-src 'self'; style-src 'self' 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
     if (config.issuer.startsWith('https:')) {
       response.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
     next();
+  });
+
+  app.use('/assets', express.static(publicDirectory, { index: false, fallthrough: false, maxAge: '1h' }));
+  app.get('/developer', (_request, response) => {
+    response.sendFile(resolve(publicDirectory, 'developer.html'));
   });
 
   app.get('/health/live', (_request, response) => {
