@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync } from 'node:crypto';
+import { hashScryptPassword } from '../src/security.js';
 import { open, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
@@ -58,14 +58,7 @@ async function main(): Promise<void> {
     throw new Error('Passwords must match and contain between 12 and 1024 characters');
   }
 
-  const salt = randomBytes(16).toString('base64url');
-  const derived = scryptSync(first, salt, 64, {
-    N: 32768,
-    r: 8,
-    p: 1,
-    maxmem: 64 * 1024 * 1024,
-  }).toString('base64url');
-  const encodedHash = `scrypt$32768$8$1$${salt}$${derived}\n`;
+  const encodedHash = `${hashScryptPassword(first)}\n`;
 
   const outputPath = resolve(outputArgument);
   await mkdir(dirname(outputPath), { recursive: true, mode: 0o700 });
