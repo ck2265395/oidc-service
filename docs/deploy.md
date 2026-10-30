@@ -10,11 +10,19 @@
 The account database is never migrated or written by this service. Configure its existing schema and a database role that has only the required SELECT privileges.
 
 ## Account portal links and profile pictures
-\nThe protected `accountPortal` setting may contain `registrationUrl`, `passwordResetUrl`, and `profileUrl`. Each value must be an HTTPS URL in production (HTTP is allowed only outside production), contains no credentials, and is never taken from a request parameter. The sign-in page opens registration and password recovery in a separate tab so the pending sign-in transaction remains available. `profilePictureBaseUrl` is optional; when configured it must be a trusted HTTPS base in production. Relative picture paths from the account database are omitted when no base is configured, and the service never fetches picture URLs server-side.\n\n## SMTP email verification
+
+The protected `accountPortal` setting may contain `registrationUrl`, `passwordResetUrl`, and `profileUrl`. Each value must be an HTTPS URL in production (HTTP is allowed only outside production), contains no credentials, and is never taken from a request parameter. The sign-in page opens registration and password recovery in a separate tab so the pending sign-in transaction remains available. `profilePictureBaseUrl` is optional; when configured it must be a trusted HTTPS base in production. Relative picture paths from the account database are omitted when no base is configured, and the service never fetches picture URLs server-side.
+
+## SMTP email verification
 
 The developer contact-email verification workflow is enabled only when the protected configuration contains an `smtp` object. The example configuration uses `null`, which leaves email verification unavailable and never marks an address verified.
 
 Configure `host`, `port`, `secure`, and `from`; set `user` and `password` together when the relay requires authentication. Keep the password in the protected runtime configuration or secret manager. With `secure: false`, the transport requires STARTTLS and TLS 1.2 or newer. Verify relay reachability and sender authorization in the target environment before enabling the workflow. Verification messages contain a single-use link that expires after 30 minutes; a same-origin confirmation form consumes it, and requests are limited per account.
+
+
+## Software inventory
+
+Run `npm run sbom` after installing dependencies to generate `sbom.cdx.json` in CycloneDX format for production dependencies. CI also attaches this file as a 90-day workflow artifact. The SBOM is generated from the locked dependency tree and should be retained with each release or deployment record.
 
 ## Container deployment
 
