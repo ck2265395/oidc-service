@@ -1,3 +1,5 @@
+import { isIP } from 'node:net';
+
 export type RuntimeMode = 'development' | 'test' | 'production';
 
 export interface ServiceConfig {
@@ -20,6 +22,7 @@ export interface ServiceConfig {
     accounts: string;
   };
   redisUrl: string;
+  trustedProxyCidrs: string[];
 }
 
 export class ConfigError extends Error {
@@ -102,6 +105,33 @@ function secretAt(value: unknown, path: string): string {
   return secret;
 }
 
+function trustedProxyCidrsAt(value: unknown): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 32) {
+    throw new ConfigError('trustedProxyCidrs must be an array with at most 32 entries');
+  }
+  return value.map((entry, index) => {
+    if (typeof entry !== 'string' || entry.length === 0 || entry.trim() !== entry || /\\s/.test(entry)) {
+      throw new ConfigError(`trustedProxyCidrs[${index}] must be an IP address or CIDR`);
+    }
+    const parts = entry.split('/');
+    if (parts.length > 2) throw new ConfigError(`trustedProxyCidrs[${index}] must be an IP address or CIDR`);
+    const version = isIP(parts[0] ?? '');
+    if (!version) throw new ConfigError(`trustedProxyCidrs[${index}] must be an IP address or CIDR`);
+    if (parts.length === 2) {
+      const prefixText = parts[1] ?? '';
+      if (!/^(0|[1-9][0-9]*)$/.test(prefixText)) {
+        throw new ConfigError(`trustedProxyCidrs[${index}] has an invalid prefix`);
+      }
+      const prefix = Number(prefixText);
+      if (!Number.isInteger(prefix) || prefix < 0 || prefix > (version === 4 ? 32 : 128)) {
+        throw new ConfigError(`trustedProxyCidrs[${index}] has an invalid prefix`);
+      }
+    }
+    return entry;
+  });
+}
+
 export function loadConfig(input: unknown): ServiceConfig {
   const root = objectAt(input, 'config');
   const modeValue = stringAt(root.mode, 'mode');
@@ -156,5 +186,6 @@ export function loadConfig(input: unknown): ServiceConfig {
       accounts: databaseUrlAt(databases.accounts, 'databases.accounts'),
     },
     redisUrl: urlAt(root.redisUrl, 'redisUrl', ['redis:', 'rediss:']),
+    trustedProxyCidrs: trustedProxyCidrsAt(root.trustedProxyCidrs),
   };
 }
