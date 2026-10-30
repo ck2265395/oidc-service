@@ -40,7 +40,11 @@ export function createApplication(
     response.sendFile(resolve(publicDirectory, 'index.html'));
   });
 
-  app.get('/developer/login', (_request, response) => {\n    response.redirect(303, '/portal/sign-in?return=%2Fdeveloper');\n  });\n\n  app.get('/developer', (_request, response) => {
+  app.get('/developer/login', (_request, response) => {
+    response.redirect(303, '/portal/sign-in?return=%2Fdeveloper');
+  });
+
+  app.get('/developer', (_request, response) => {
     response.sendFile(resolve(publicDirectory, 'developer.html'));
   });
 
