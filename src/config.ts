@@ -149,7 +149,7 @@ function smtpConfigAt(value: unknown): ServiceConfig['smtp'] {
   const password = input.password === undefined || input.password === null || input.password === '' ? null : stringAt(input.password, 'smtp.password');
   if ((user === null) !== (password === null)) throw new ConfigError('smtp.user and smtp.password must be configured together');
   const from = stringAt(input.from, 'smtp.from');
-  if (from.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(from)) throw new ConfigError('smtp.from must be an email address');
+  if (from.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from)) throw new ConfigError('smtp.from must be an email address');
   return { host, port: Number(input.port), secure: input.secure, user, password, from };
 }
 
