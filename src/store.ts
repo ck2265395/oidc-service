@@ -31,6 +31,7 @@ export interface ApplicationRepository {
   getOwnedApplication(id: string, ownerUuid: string): Promise<ApplicationRecord | null>;
   getApplicationByClientId(clientId: string): Promise<ApplicationRecord | null>;
   groupOwnedBy(ownerUuid: string, groupId: string): Promise<boolean>;
+  groupApprovedBy(ownerUuid: string, groupId: string): Promise<boolean>;
   compareAndSwap(
     previous: ApplicationRecord,
     next: ApplicationRecord,
@@ -229,6 +230,18 @@ export class PostgresApplicationRepository implements ApplicationRepository {
     try {
       const result = await this.pool.query<{ exists: boolean }>(
         "SELECT EXISTS (SELECT 1 FROM application_group WHERE id = $1 AND owner_account_uuid = $2) AS exists",
+        [groupId, ownerUuid],
+      );
+      return result.rows[0]?.exists === true;
+    } catch {
+      throw new PlatformStorageError();
+    }
+  }
+
+  async groupApprovedBy(ownerUuid: string, groupId: string): Promise<boolean> {
+    try {
+      const result = await this.pool.query<{ exists: boolean }>(
+        "SELECT EXISTS (SELECT 1 FROM application_group WHERE id = $1 AND owner_account_uuid = $2 AND status = 'approved') AS exists",
         [groupId, ownerUuid],
       );
       return result.rows[0]?.exists === true;
