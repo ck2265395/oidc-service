@@ -322,6 +322,15 @@ export class ApplicationService {
     return { record, config };
   }
 
+  async listForAdmin(
+    page = 1,
+    pageSize = 20,
+    status: ApplicationStatus = 'pending',
+  ): Promise<ApplicationPage> {
+    if (!this.repository.listForAdmin) throw new ApplicationConflictError('Administrative listing is unavailable');
+    return this.repository.listForAdmin(page, pageSize, status);
+  }
+
   async listOwned(
     ownerUuid: string,
     page = 1,
