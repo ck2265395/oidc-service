@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="DT Identity 身份服务入口">
+  <title>DT Identity · 身份服务</title>
+  <link rel="stylesheet" href="/assets/home.css">
+</head>
+<body>
+  <header class="header">
+    <a class="brand" href="/" aria-label="DT Identity home"><span class="mark">DT</span><span>Identity</span></a>
+    <span class="header-note"><span class="dot"></span>OIDC Identity Service</span>
+  </header>
+  <main>
+    <section class="hero">
+      <div class="hero-content">
+        <p class="eyebrow">DT IDENTITY · OPENID CONNECT</p>
+        <h1>一个安全、清晰的<br><em>身份接入入口</em></h1>
+        <p class="lead">使用已有身份登录已接入的应用，并在一个地方管理应用授权。</p>
+        <p class="english">Sign in to connected applications and manage your authorizations.</p>
+        <a class="primary-link" href="/portal/authorizations">管理我的授权 <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="hero-art" aria-hidden="true"><span class="orbit orbit-one"></span><span class="orbit orbit-two"></span><span class="core">DT</span><span class="node node-one">ID</span><span class="node node-two">✓</span></div>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><div><p class="eyebrow">WORKSPACES</p><h2>选择你的入口</h2></div><p>Choose a workspace</p></div>
+      <div class="cards">
+        <a class="card" href="/portal/authorizations">
+          <span class="card-icon icon-user">↗</span><span class="card-label">个人账户</span>
+          <strong>授权管理</strong><span class="card-copy">查看已授权的应用，按需撤销访问权限。</span>
+          <span class="card-en">Review and revoke application access.</span><span class="card-arrow">→</span>
+        </a>
+        <a class="card" href="/developer">
+          <span class="card-icon icon-dev">⌘</span><span class="card-label">DEVELOPER</span>
+          <strong>开发者中心</strong><span class="card-copy">登记开发者资料，创建应用并提交审核。</span>
+          <span class="card-en">Register applications and manage review status.</span><span class="card-arrow">→</span>
+        </a>
+        <a class="card" href="/admin/login">
+          <span class="card-icon icon-admin">▦</span><span class="card-label">OPERATIONS</span>
+          <strong>运营管理</strong><span class="card-copy">管理员专用的应用审核与运营审计入口。</span>
+          <span class="card-en">Review applications and inspect operations.</span><span class="card-arrow">→</span>
+        </a>
+      </div>
+    </section>
+
+    <aside class="notice"><span class="notice-mark">i</span><p><strong>如何登录</strong><br>通过接入应用发起登录后，本服务会在需要时验证你的身份。此页面不会要求你在任意表单中输入账户密码。<br><span>Start sign-in from a connected application. This page never asks for your password.</span></p></aside>
+  </main>
+  <footer><span>DT Identity</span><span>OpenID Connect · Authorization Code + PKCE</span></footer>
+</body>
+</html>
