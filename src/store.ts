@@ -1,7 +1,6 @@
 import { Pool, type PoolClient } from 'pg';
 
 import {
-  ApplicationValidationError,
   validateApplicationDraft,
   type ApplicationDraft,
   type ClientType,
