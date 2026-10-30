@@ -1,5 +1,7 @@
 # API guide
 
+The developer portal is served at `/developer` with static assets under `/assets/`. It uses the same owner-scoped APIs documented below; an active identity-service session is required.
+
 All application APIs require an active OIDC provider session. Successful responses use:
 
 ```json
