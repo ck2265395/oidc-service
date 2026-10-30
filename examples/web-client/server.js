@@ -134,7 +134,39 @@ async function handle(request, response) {
   }
   if (url.pathname === '/logout' && request.method === 'GET') {
     const id = readCookie(request, cookieName);
-    if (id) sessions.delete(id);
+    const session = id ? sessions.get(id) : null;
+    if (!session || session.expiresAt <= Date.now()) {
+      if (id) sessions.delete(id);
+      setSessionCookie(response, '', 0);
+      response.writeHead(303, { Location: '/' }).end();
+      return;
+    }
+    const oidc = await discover();
+    if (!oidc.end_session_endpoint) {
+      sessions.delete(id);
+      setSessionCookie(response, '', 0);
+      response.writeHead(303, { Location: '/' }).end();
+      return;
+    }
+    for (const [key, expiresAt] of logoutStates) if (expiresAt < Date.now()) logoutStates.delete(key);
+    const state = randomValue();
+    logoutStates.set(state, Date.now() + 600000);
+    sessions.delete(id);
+    const endSession = new URL(oidc.end_session_endpoint);
+    endSession.searchParams.set('id_token_hint', session.idToken);
+    endSession.searchParams.set('post_logout_redirect_uri', new URL('/logout/callback', appOrigin).toString());
+    endSession.searchParams.set('state', state);
+    response.writeHead(303, { Location: endSession.toString() }).end();
+    return;
+  }
+  if (url.pathname === '/logout/callback' && request.method === 'GET') {
+    const state = url.searchParams.get('state') || '';
+    const expiresAt = logoutStates.get(state);
+    logoutStates.delete(state);
+    if (!expiresAt || expiresAt < Date.now()) {
+      response.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' }).end(page('Sign-out failed', '<p>The sign-out transaction expired.</p>'));
+      return;
+    }
     setSessionCookie(response, '', 0);
     response.writeHead(303, { Location: '/' }).end();
     return;
