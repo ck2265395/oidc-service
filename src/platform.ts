@@ -245,6 +245,12 @@ export class ApplicationService {
     if (!record) return null;
     const config = effectiveApplicationConfig(record);
     if (!config) return null;
+    if (
+      config.groupId !== null &&
+      !(await this.repository.groupApprovedBy(record.ownerUuid, config.groupId))
+    ) {
+      config.groupId = null;
+    }
     return { record, config };
   }
 
