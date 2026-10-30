@@ -333,14 +333,54 @@ export function createAdminRouter(
 
   router.get('/statistics', async (request, response) => {
     if (!await adminSession(request)) return response.redirect(303, '/admin/login');
+    const daysText = typeof request.query.days === 'string' ? request.query.days : '7';
+    const days = /^[1-9][0-9]*$/.test(daysText) ? Number(daysText) : Number.NaN;
+    const applicationId = typeof request.query.applicationId === 'string' ? request.query.applicationId : '';
+    if (
+      !Number.isSafeInteger(days) || days < 1 || days > 90 ||
+      (applicationId !== '' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(applicationId))
+    ) return sendError(response, 400, '筛选条件无效。');
     try {
-      const result = await pool.query<{ status: string; count: string }>(
-        'SELECT status, count(*)::text AS count FROM oidc_application GROUP BY status ORDER BY status',
+      const result = await pool.query<{
+        application_name: string;
+        application_id: string | null;
+        action: string;
+        outcome: string;
+        request_count: string;
+        average_ms: string | null;
+        p95_ms: string | null;
+      }>(
+        "SELECT coalesce(a.draft_config->>'name', '平台门户或未知客户端') AS application_name, p.application_id::text, " +
+        'p.action, p.outcome, count(*)::text AS request_count, ' +
+        "round(avg((p.details->>'durationMs')::numeric), 1)::text AS average_ms, " +
+        "round(percentile_cont(0.95) WITHIN GROUP (ORDER BY (p.details->>'durationMs')::double precision)::numeric, 1)::text AS p95_ms " +
+        'FROM platform_audit p LEFT JOIN oidc_application a ON a.id = p.application_id ' +
+        "WHERE p.action LIKE 'protocol.%' AND p.created_at >= now() - ($1::int * interval '1 day') " +
+        'AND ($2::uuid IS NULL OR p.application_id = $2::uuid) ' +
+        'GROUP BY a.draft_config, p.application_id, p.action, p.outcome ORDER BY count(*) DESC LIMIT 500',
+        [days, applicationId || null],
       );
       const rows = result.rows.map((row) =>
+        '<tr><td>' + escapeHtml(row.application_name) + '</td><td>' + escapeHtml(row.application_id ?? '') +
+        '</td><td>' + escapeHtml(row.action.replace('protocol.', '')) + '</td><td>' + escapeHtml(row.outcome) +
+        '</td><td>' + escapeHtml(row.request_count) + '</td><td>' + escapeHtml(row.average_ms ?? '—') +
+        '</td><td>' + escapeHtml(row.p95_ms ?? '—') + '</td></tr>',
+      ).join('');
+      const filter = '<form method="get" action="/admin/statistics"><label for="days">统计区间（天）</label>' +
+        '<input id="days" name="days" type="number" min="1" max="90" value="' + days + '">' +
+        '<label for="applicationId">应用 ID（可选）</label><input id="applicationId" name="applicationId" value="' +
+        escapeHtml(applicationId) + '"><button type="submit">筛选</button></form>';
+      const statusResult = await pool.query<{ status: string; count: string }>(
+        'SELECT status, count(*)::text AS count FROM oidc_application GROUP BY status ORDER BY status',
+      );
+      const statusRows = statusResult.rows.map((row) =>
         '<tr><td>' + escapeHtml(row.status) + '</td><td>' + escapeHtml(row.count) + '</td></tr>',
       ).join('');
-      response.type('html').send(html('应用统计', '<p>统计口径：当前应用记录按状态聚合，使用数据库 UTC 时间戳。</p><table><thead><tr><th>状态</th><th>数量</th></tr></thead><tbody>' + rows + '</tbody></table>'));
+      const content = filter +
+        '<p>请求统计口径：按平台收到的授权、令牌、用户信息、撤销与退出 HTTP 请求计数；区间按数据库时间，延迟为服务端响应耗时。重试计为独立请求，不能代表独立用户或转化率。</p>' +
+        '<table><thead><tr><th>应用</th><th>应用 ID</th><th>端点</th><th>结果</th><th>请求数</th><th>平均毫秒</th><th>P95 毫秒</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+        '<h2>当前应用状态</h2><table><thead><tr><th>状态</th><th>数量</th></tr></thead><tbody>' + statusRows + '</tbody></table>';
+      response.type('html').send(html('应用与请求统计', content));
     } catch {
       sendError(response, 503, '统计数据暂时不可用。');
     }
