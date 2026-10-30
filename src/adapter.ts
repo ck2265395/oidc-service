@@ -119,7 +119,11 @@ export class PostgresOidcAdapter implements Adapter {
   private async findApprovedClient(clientId: string): Promise<AdapterPayload | undefined> {
     try {
       const active = await this.applications.activeClient(clientId);
-      if (!active || active.record.type === 'web') return undefined;
+      if (!active) return undefined;
+      const clientSecret = active.record.type === 'web'
+        ? await this.applications.getClientSecret(clientId)
+        : null;
+      if (active.record.type === 'web' && !clientSecret) return undefined;
       return {
         client_id: active.record.clientId,
         client_name: active.config.name,
@@ -132,7 +136,8 @@ export class PostgresOidcAdapter implements Adapter {
         response_types: ['code'],
         grant_types: ['authorization_code'],
         scope: active.config.scopes.join(' '),
-        token_endpoint_auth_method: 'none',
+        token_endpoint_auth_method: active.record.type === 'web' ? 'client_secret_basic' : 'none',
+        ...(clientSecret ? { client_secret: clientSecret } : {}),
         application_type: active.record.type === 'native' ? 'native' : 'web',
         id_token_signed_response_alg: 'RS256',
       };
