@@ -14,6 +14,7 @@ import { createInteractionRouter } from './interactions.js';
 import { createDeveloperRouter } from './developer.js';
 import { createAdminRouter } from './admin.js';
 import { createUserPortalRouter } from './user-portal.js';
+import { createUserApiRouter } from './user-api.js';
 import { ApplicationService } from './platform.js';
 import { ApplicationGroupService } from './groups.js';
 import { createPlatformPool, PostgresApplicationRepository } from './store.js';
@@ -157,7 +158,8 @@ export async function start(): Promise<void> {
         [event.requestId, action, event.outcome, details, event.clientId],
       );
     };
-    const server = createServer(createApplication(config, provider, interactions, developer, admin, userPortal, readiness, recordProtocolEvent));
+    const userApi = createUserApiRouter(provider, accounts);
+    const server = createServer(createApplication(config, provider, interactions, developer, admin, userPortal, readiness, recordProtocolEvent, userApi));
 
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
