@@ -31,6 +31,7 @@ export interface ApplicationRepository {
   getApplication(id: string): Promise<ApplicationRecord | null>;
   getOwnedApplication(id: string, ownerUuid: string): Promise<ApplicationRecord | null>;
   getApplicationByClientId(clientId: string): Promise<ApplicationRecord | null>;
+  groupOwnedBy(ownerUuid: string, groupId: string): Promise<boolean>;
   compareAndSwap(
     previous: ApplicationRecord,
     next: ApplicationRecord,
@@ -223,6 +224,18 @@ export class PostgresApplicationRepository implements ApplicationRepository {
       'SELECT ' + APPLICATION_COLUMNS + ' FROM oidc_application WHERE client_id = $1 LIMIT 1',
       [clientId],
     );
+  }
+
+  async groupOwnedBy(ownerUuid: string, groupId: string): Promise<boolean> {
+    try {
+      const result = await this.pool.query<{ exists: boolean }>(
+        "SELECT EXISTS (SELECT 1 FROM application_group WHERE id = $1 AND owner_account_uuid = $2) AS exists",
+        [groupId, ownerUuid],
+      );
+      return result.rows[0]?.exists === true;
+    } catch {
+      throw new PlatformStorageError();
+    }
   }
 
   async compareAndSwap(
