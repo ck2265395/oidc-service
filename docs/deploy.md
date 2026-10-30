@@ -1,0 +1,38 @@
+# Deployment guide
+
+## Runtime requirements
+
+- Node.js 24 and npm 11, or Docker Engine with the Compose plugin.
+- PostgreSQL for OIDC platform data and a separate, existing account database with a read-only login role.
+- Redis 7.4 or compatible Redis server. Login throttles, replay detection, portal login transactions, and client-cache invalidation use Redis.
+- A stable HTTPS issuer URL, protected configuration and signing-key files, and a reverse proxy that preserves the original host and protocol.
+
+The account database is never migrated or written by this service. Configure its existing schema and a database role that has only the required SELECT privileges.
+
+## Container deployment
+
+1. Copy `config.example.json` to `runtime/config.json` and replace every placeholder with actual protected values. Set the OIDC database URL to `oidc-db` and Redis URL to `redis` for the Compose network. Configure the account database URL using a host reachable from the container.
+2. Set `mode` to `production`, configure the public HTTPS `issuer`, and list only actual reverse-proxy CIDRs in `trustedProxyCidrs`.
+3. Generate signing material outside the repository with `npm run keys -- --out runtime/signing.json`; provide the other generated keys in the protected configuration. Create an administrator password hash with `npm run admin:password`.
+4. Set `OIDC_DB_PASSWORD` to the same strong password configured in the OIDC database URL and Compose environment. Keep `runtime/` out of version control.
+5. Start PostgreSQL and Redis, then build and start the service:
+
+```sh
+docker compose up --build -d
+docker compose ps
+docker compose logs -f identity
+```
+
+The Compose PostgreSQL initialization runs `sql/postgre.sql` only when the data volume is first created. For existing volumes, apply reviewed schema changes through a controlled migration process; do not delete a volume to force initialization.
+
+## Health and operations
+
+- `GET /health/live` reports process liveness.
+- `GET /health/ready` checks PostgreSQL, the account database, and Redis.
+- Terminate with SIGTERM; the service closes HTTP, PostgreSQL, and Redis connections.
+- Back up PostgreSQL and Redis data volumes using the platform’s approved backup process. Signing keys and service secrets require separate encrypted backup and access controls.
+- Rotate signing keys with a planned JWKS overlap and client coordination. The current key loader accepts one active RS256 signing key; automated rotation is not implemented.
+
+## Deployment acceptance still required
+
+The repository does not include access to the actual account database, production proxy, secret manager, SMTP relay, or deployment platform. Validate the read-only role, database schema, proxy trust boundaries, Redis durability/availability, issuer discovery, client flows, backup/restore, and rolling multi-instance behavior in the target environment before production use. This repository's CI runs unit and HTTP checks; it does not claim a live production-like PostgreSQL and Redis acceptance run.
