@@ -6,16 +6,18 @@ import { createServer } from 'node:http';
 import { createApplication } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 
+const testSecret = () => randomBytes(32).toString('base64url');
+
 const config = loadConfig({
   mode: 'test',
   issuer: 'https://identity.example.test',
   port: 3000,
   secrets: {
     legacyHmacKey: randomBytes(32).toString('base64url'),
-    cookie: 'c'.repeat(48),
-    fingerprint: 'f'.repeat(48),
-    subject: 's'.repeat(48),
-    encryption: 'e'.repeat(48),
+    cookie: testSecret(),
+    fingerprint: testSecret(),
+    subject: testSecret(),
+    encryption: testSecret(),
   },
   admin: { username: 'ops', passwordHash: 'scrypt$16384$8$1$salt$hash' },
   databases: {
