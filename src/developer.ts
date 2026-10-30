@@ -131,6 +131,37 @@ export function createDeveloperRouter(
     response.json({ code: 0, desc: 'ok', data: { token } });
   });
 
+  router.get('/profile', async (request, response) => {
+    const ownerUuid = await authenticatedOwner(request, response);
+    if (!ownerUuid) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
+    try {
+      const profile = await applications.getDeveloperProfile(ownerUuid);
+      response.json({ code: 0, desc: 'ok', data: profile });
+    } catch {
+      jsonError(response, 503, 'storage_unavailable', 'Developer profile is unavailable');
+    }
+  });
+
+  router.put('/profile', async (request, response) => {
+    if (!ensureWriteRequest(request, response)) return;
+    const ownerUuid = await authenticatedOwner(request, response);
+    if (!ownerUuid) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
+    const input = body(request);
+    if (!Number.isSafeInteger(input.expectedRevision) || Number(input.expectedRevision) < 0) {
+      return jsonError(response, 400, 'invalid_revision', 'A profile revision is required');
+    }
+    try {
+      const profile = await applications.saveDeveloperProfile(ownerUuid, {
+        displayName: input.displayName,
+        contactEmail: input.contactEmail,
+      }, Number(input.expectedRevision));
+      response.json({ code: 0, desc: 'ok', data: profile });
+    } catch (error) {
+      if (error instanceof ApplicationConflictError) return jsonError(response, 409, 'profile_conflict', error.message);
+      jsonError(response, 503, 'storage_unavailable', 'Developer profile is unavailable');
+    }
+  });
+
   router.get('/groups', async (request, response) => {
     const ownerUuid = await authenticatedOwner(request, response);
     if (!ownerUuid) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
