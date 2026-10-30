@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type Provider from 'oidc-provider';
 
-import { AccountService } from './accounts.js';
+import { AccountService, safeProfilePictureUrl } from './accounts.js';
 
 function maskedEmail(value: string | null): string | null {
   if (!value) return null;
@@ -10,7 +10,7 @@ function maskedEmail(value: string | null): string | null {
   return value.slice(0, 1) + '***' + value.slice(at);
 }
 
-export function createUserApiRouter(provider: Provider, accounts: AccountService): Router {
+export function createUserApiRouter(provider: Provider, accounts: AccountService, pictureBaseUrl: string | null = null): Router {
   const router = Router();
   router.get('/', async (request, response) => {
     try {
@@ -39,6 +39,7 @@ export function createUserApiRouter(provider: Provider, accounts: AccountService
         data: {
           nickname: identity.profile.nickname,
           email: maskedEmail(identity.profile.email),
+          picture: safeProfilePictureUrl(identity.profile.picture, pictureBaseUrl),
         },
       });
     } catch {
