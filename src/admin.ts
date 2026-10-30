@@ -39,7 +39,7 @@ function hashToken(token: string): string {
 }
 
 function ipKey(request: Request, secret: string): string {
-  const address = request.socket.remoteAddress ?? 'unknown';
+  const address = request.ip || request.socket.remoteAddress || 'unknown';
   return createHmac('sha256', secret).update(address, 'utf8').digest('hex');
 }
 
