@@ -109,7 +109,14 @@ export async function start(): Promise<void> {
     );
     const admin = createAdminRouter(oidcPool, config, applications, groups);
     const userPortal = createUserPortalRouter(oidcPool, provider, accounts, config);
-    const server = createServer(createApplication(config, provider, interactions, developer, admin, userPortal));
+    const readiness = async (): Promise<void> => {
+      await Promise.all([
+        oidcPool.query('SELECT 1'),
+        accountPool.query('SELECT 1'),
+        redisClient.ping(),
+      ]);
+    };
+    const server = createServer(createApplication(config, provider, interactions, developer, admin, userPortal, readiness));
 
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
