@@ -357,7 +357,7 @@ export function createAdminRouter(
         'FROM platform_audit p LEFT JOIN oidc_application a ON a.id = p.application_id ' +
         "WHERE p.action LIKE 'protocol.%' AND p.created_at >= now() - ($1::int * interval '1 day') " +
         'AND ($2::uuid IS NULL OR p.application_id = $2::uuid) ' +
-        'GROUP BY a.draft_config, p.application_id, p.action, p.outcome ORDER BY count(*) DESC LIMIT 500',
+        'GROUP BY coalesce(a.draft_config->>'name', '平台门户或未知客户端'), p.application_id, p.action, p.outcome ORDER BY count(*) DESC LIMIT 500',
         [days, applicationId || null],
       );
       const rows = result.rows.map((row) =>
