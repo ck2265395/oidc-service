@@ -10,6 +10,7 @@ const config = loadConfig({
   issuer: 'https://identity.example.test',
   port: 3000,
   secrets: {
+    legacyHmacKey: 'l'.repeat(48),
     cookie: 'c'.repeat(48),
     fingerprint: 'f'.repeat(48),
     subject: 's'.repeat(48),
