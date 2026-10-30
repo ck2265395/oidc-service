@@ -182,6 +182,8 @@ export function createDeveloperRouter(
     if (!ensureWriteRequest(request, response)) return;
     const ownerUuid = await authenticatedOwner(request, response);
     if (!ownerUuid) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
+    const profile = await applications.getDeveloperProfile(ownerUuid);
+    if (!profile) return jsonError(response, 409, 'profile_required', 'Register a developer profile first');
     try {
       const group = await groups.create(ownerUuid, body(request).displayName);
       response.status(201).json({ code: 0, desc: 'ok', data: group });
@@ -219,6 +221,8 @@ export function createDeveloperRouter(
     if (!ensureWriteRequest(request, response)) return;
     const ownerUuid = await authenticatedOwner(request, response);
     if (!ownerUuid) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
+    const profile = await applications.getDeveloperProfile(ownerUuid);
+    if (!profile) return jsonError(response, 409, 'profile_required', 'Register a developer profile first');
     const input = body(request);
     const type = scalar(input.type);
     if (!type || !['web', 'spa', 'native'].includes(type)) {
