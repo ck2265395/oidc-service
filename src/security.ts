@@ -98,7 +98,8 @@ export function hashScryptPassword(password: string): string {
     maxmem: 64 * 1024 * 1024,
   }).toString('base64url');
 
-  return ['scrypt', SCRYPT_N, SCRYPT_R, SCRYPT_P, saltValue, derived].join('
+  const separator = String.fromCharCode(36);
+  return ['scrypt', SCRYPT_N, SCRYPT_R, SCRYPT_P, saltValue, derived].join(separator);
 }
 
 export function verifyScryptPassword(password: string, encodedHash: string): boolean {
