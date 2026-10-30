@@ -12,7 +12,9 @@
     "start": "node dist/src/main.js",
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit -p tsconfig.json",
-    "lint": "eslint src test eslint.config.js",
+    "lint": "eslint src test scripts eslint.config.js",
+    "keys": "tsx scripts/keys.ts",
+    "admin:password": "tsx scripts/admin-password.ts",
     "test": "tsx --test test/*.test.ts",
     "test:storage": "tsx --test 'test/storage/**/*.test.ts'"
   },
