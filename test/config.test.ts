@@ -11,6 +11,7 @@ const validConfig = () => ({
   issuer: 'https://identity.example.test',
   port: 3000,
   secrets: {
+    legacyHmacKey: testSecret(),
     cookie: testSecret(),
     fingerprint: testSecret(),
     subject: testSecret(),
@@ -60,6 +61,14 @@ test('requires independent cryptographic keys', () => {
   input.secrets.fingerprint = input.secrets.cookie;
 
   assert.throws(() => loadConfig(input), /independent/);
+});
+
+
+test('requires an independently supplied legacy account key', () => {
+  const input = validConfig();
+  input.secrets.legacyHmacKey = 'CHANGE_ME_USE_THE_EXISTING_ACCOUNT_KEY';
+
+  assert.throws(() => loadConfig(input), /secrets\.legacyHmacKey/);
 });
 
 test('requires HTTPS issuer in production', () => {
