@@ -5,6 +5,7 @@ export interface ServiceConfig {
   issuer: string;
   port: number;
   secrets: {
+    legacyHmacKey: string;
     cookie: string;
     fingerprint: string;
     subject: string;
@@ -82,6 +83,14 @@ function databaseUrlAt(value: unknown, path: string): string {
   return raw;
 }
 
+function legacyKeyAt(value: unknown, path: string): string {
+  const key = stringAt(value, path, 32);
+  if (new Set(key).size < 16 || /^(replace|change|example|your|set)[-_]/i.test(key)) {
+    throw new ConfigError(`${path} must be a strong key supplied by the existing account system`);
+  }
+  return key;
+}
+
 function secretAt(value: unknown, path: string): string {
   const secret = stringAt(value, path, 43);
   const alphabet = /^[A-Za-z0-9_-]+$/.test(secret);
@@ -115,6 +124,7 @@ export function loadConfig(input: unknown): ServiceConfig {
   const admin = objectAt(root.admin, 'admin');
   const databases = objectAt(root.databases, 'databases');
   const secrets = {
+    legacyHmacKey: legacyKeyAt(secretsInput.legacyHmacKey, 'secrets.legacyHmacKey'),
     cookie: secretAt(secretsInput.cookie, 'secrets.cookie'),
     fingerprint: secretAt(secretsInput.fingerprint, 'secrets.fingerprint'),
     subject: secretAt(secretsInput.subject, 'secrets.subject'),
