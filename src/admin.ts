@@ -4,7 +4,7 @@ import express, { type Request, type Response, Router } from 'express';
 import type { Pool } from 'pg';
 
 import type { ServiceConfig } from './config.js';
-import type { ApplicationRecord, ApplicationStatus, ApplicationService } from './platform.js';
+import type { ApplicationStatus, ApplicationService, ReviewCommand } from './platform.js';
 import { constantTimeEqual, escapeHtml, randomToken, verifyScryptPassword } from './security.js';
 
 const SECURE_COOKIE = '__Host-dt-admin';
@@ -134,7 +134,7 @@ export function createAdminRouter(
     const key = ipKey(request, config.secrets.cookie);
     try {
       const limit = await pool.query<{ blocked: boolean }>(
-        'SELECT coalesce(max(blocked_until > now()), false) AS blocked FROM admin_login_limit WHERE ip_hash = $1',
+        'SELECT coalesce(bool_or(blocked_until > now()), false) AS blocked FROM admin_login_limit WHERE ip_hash = $1',
         [key],
       );
       if (limit.rows[0]?.blocked) return sendError(response, 429, '登录尝试过多，请稍后再试。');
@@ -258,11 +258,13 @@ export function createAdminRouter(
       return sendError(response, 400, '审核操作无效。');
     }
     try {
-      const record = await applications.review(request.params.id, revision, {
-        action: action as 'approve' | 'reject' | 'disable',
-        reviewerUuid: 'admin:' + config.admin.username,
-        ...(action === 'approve' ? {} : { reason: reason ?? '' }),
-      });
+      const reviewerUuid = 'admin:' + config.admin.username;
+      const command: ReviewCommand = action === 'approve'
+        ? { action: 'approve', reviewerUuid }
+        : action === 'reject'
+          ? { action: 'reject', reviewerUuid, reason: reason ?? '' }
+          : { action: 'disable', reviewerUuid, reason: reason ?? '' };
+      const record = await applications.review(request.params.id, revision, command);
       if (!record) return sendError(response, 404, '应用不存在。');
       response.redirect(303, '/admin/applications/' + encodeURIComponent(record.id));
     } catch {
