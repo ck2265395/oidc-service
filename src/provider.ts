@@ -23,6 +23,7 @@ export function createProvider(
   adapter: AdapterFactory,
   accounts: AccountService,
   applications: ApplicationService,
+  cookieKey: string,
 ): Provider {
   const provider = new Provider(issuer, {
     adapter,
@@ -58,9 +59,10 @@ export function createProvider(
       registration: { enabled: false },
       registrationManagement: { enabled: false },
       revocation: { enabled: true },
+      pkce: { enabled: true, supportedMethods: ['S256'] },
     },
     cookies: {
-      keys: [],
+      keys: [cookieKey],
       long: { httpOnly: true, sameSite: 'lax', secure: issuer.startsWith('https:') },
       short: { httpOnly: true, sameSite: 'lax', secure: issuer.startsWith('https:') },
     },
