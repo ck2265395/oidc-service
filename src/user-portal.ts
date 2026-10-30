@@ -124,9 +124,97 @@ export function createUserPortalRouter(
     return left.length === right.length && timingSafeEqual(left, right);
   };
 
+  router.get('/sign-in', async (request, response) => {
+    const returnTo = safeReturnPath(request.query.return);
+    if (await currentSession(request, response)) return response.redirect(303, returnTo);
+    const state = randomBytes(32).toString('base64url');
+    const loginState: PortalState = {
+      verifier: randomBytes(32).toString('base64url'),
+      nonce: randomBytes(32).toString('base64url'),
+      returnTo,
+    };
+    try {
+      const stored = await redis.set(
+        loginStateKey(state, config.secrets.cookie),
+        JSON.stringify(loginState),
+        { EX: PORTAL_STATE_TTL_SECONDS, NX: true },
+      );
+      if (stored !== 'OK') throw new Error('Portal login state could not be stored');
+      const challenge = createHash('sha256').update(loginState.verifier, 'utf8').digest('base64url');
+      const authorization = new URL(config.issuer + '/authorize');
+      authorization.searchParams.set('client_id', PORTAL_CLIENT_ID);
+      authorization.searchParams.set('redirect_uri', config.issuer + '/portal/callback');
+      authorization.searchParams.set('response_type', 'code');
+      authorization.searchParams.set('scope', 'openid profile email');
+      authorization.searchParams.set('state', state);
+      authorization.searchParams.set('nonce', loginState.nonce);
+      authorization.searchParams.set('code_challenge', challenge);
+      authorization.searchParams.set('code_challenge_method', 'S256');
+      response.redirect(303, authorization.toString());
+    } catch {
+      error(response, 503, '登录服务暂时不可用，请稍后重试。');
+    }
+  });
+
+  router.get('/callback', async (request, response) => {
+    const state = scalar(request.query.state);
+    const code = scalar(request.query.code);
+    if (!state || !/^[A-Za-z0-9_-]{43}$/.test(state) || !code || code.length > 4096) {
+      return error(response, 400, '登录事务无效，请重新开始。');
+    }
+
+    try {
+      const stored = await redis.eval(TAKE_PORTAL_STATE, {
+        keys: [loginStateKey(state, config.secrets.cookie)],
+        arguments: [],
+      });
+      if (typeof stored !== 'string') return error(response, 400, '登录事务已失效，请重新开始。');
+      const parsed = JSON.parse(stored) as unknown;
+      if (
+        typeof parsed !== 'object' || parsed === null || Array.isArray(parsed) ||
+        typeof (parsed as PortalState).verifier !== 'string' ||
+        typeof (parsed as PortalState).nonce !== 'string' ||
+        typeof (parsed as PortalState).returnTo !== 'string'
+      ) return error(response, 400, '登录事务无效，请重新开始。');
+      const loginState = parsed as PortalState;
+      const tokenResponse = await fetch(config.issuer + '/token', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: config.issuer + '/portal/callback',
+          client_id: PORTAL_CLIENT_ID,
+          code_verifier: loginState.verifier,
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!tokenResponse.ok) return error(response, 400, '登录验证失败，请重新开始。');
+      const tokens = await tokenResponse.json() as Record<string, unknown>;
+      if (typeof tokens.id_token !== 'string') return error(response, 400, '登录验证失败，请重新开始。');
+      const verified = await jwtVerify(tokens.id_token, portalJwks(provider, config.issuer), {
+        issuer: config.issuer,
+        audience: PORTAL_CLIENT_ID,
+        nonce: loginState.nonce,
+      });
+      const session = await currentSession(request, response);
+      if (!session) return error(response, 401, '登录状态已失效，请重新开始。');
+      const fingerprint = session.accountId.slice(session.accountId.lastIndexOf('.') + 1);
+      const identity = await accounts.resolve(session.uuid, fingerprint, PORTAL_CLIENT_ID);
+      if (!identity || verified.payload.sub !== identity.sub) {
+        return error(response, 401, '身份验证未通过，请重新开始。');
+      }
+      response.redirect(303, safeReturnPath(loginState.returnTo));
+    } catch {
+      error(response, 503, '登录验证暂时不可用，请稍后重试。');
+    }
+  });
+
+  router.get('/', (_request, response) => response.redirect(303, '/portal/authorizations'));
+
   router.get('/authorizations', async (request, response) => {
     const session = await currentSession(request, response);
-    if (!session) return error(response, 401, '请先通过身份服务登录。');
+    if (!session) return response.redirect(303, '/portal/sign-in?return=%2Fportal%2Fauthorizations');
     try {
       const result = await pool.query<{
         document_id: string;
