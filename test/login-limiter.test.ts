@@ -19,7 +19,7 @@ test('login limits use atomic Redis counters without storing identifiers or addr
   const redis = new FakeRedis();
   const limiter = new RedisLoginRateLimiter(redis, 'test-key'.repeat(8));
 
-  await limiter.consume('email', 'Person@example.invalid', '192.0.2.10');
+  await limiter.consume('internal-account-1', 'email', 'Person@example.invalid', '192.0.2.10');
 
   assert.equal(redis.calls.length, 1);
   assert.match(redis.calls[0]?.script ?? '', /INCR/);
@@ -37,7 +37,7 @@ test('login limiter rejects attempts beyond configured limits and reports retry 
   const limiter = new RedisLoginRateLimiter(redis, 'test-key'.repeat(8));
 
   await assert.rejects(
-    limiter.consume('username', 'sample-user', '192.0.2.11'),
+    limiter.consume(null, 'username', 'sample-user', '192.0.2.11'),
     (error: unknown) => error instanceof LoginRateLimitError && error.retryAfterSeconds === 73,
   );
 });
@@ -47,5 +47,16 @@ test('Redis failures propagate so login cannot fall back to an unthrottled path'
   redis.failure = new Error('redis unavailable');
   const limiter = new RedisLoginRateLimiter(redis, 'test-key'.repeat(8));
 
-  await assert.rejects(limiter.consume('username', 'sample-user', '192.0.2.12'), /redis unavailable/);
+  await assert.rejects(limiter.consume(null, 'username', 'sample-user', '192.0.2.12'), /redis unavailable/);
+});
+
+test('the same resolved account shares one throttle bucket across login types', async () => {
+  const redis = new FakeRedis();
+  const limiter = new RedisLoginRateLimiter(redis, 'test-key'.repeat(8));
+
+  await limiter.consume('stable-account-id', 'username', 'sample-name', '192.0.2.20');
+  await limiter.consume('stable-account-id', 'email', 'person@example.invalid', '192.0.2.20');
+
+  assert.equal(redis.calls[0]?.options.keys[0], redis.calls[1]?.options.keys[0]);
+  assert.notEqual(redis.calls[0]?.options.keys[0], 'stable-account-id');
 });
