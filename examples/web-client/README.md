@@ -7,7 +7,7 @@ This sample is a small server-side relying party. It uses authorization code wit
 Create a Web application in the developer center and use these exact values:
 
 - Login callback: http://127.0.0.1:4000/callback for a development-mode service; for production use an HTTPS origin you control.
-- Logout return: http://127.0.0.1:4000/ (or the matching HTTPS URL).
+- Logout return: http://127.0.0.1:4000/logout/callback (or the matching HTTPS URL).
 - Request openid, profile, and email.
 - Fill the required public HTTPS application homepage, privacy policy, and terms URLs, then submit the application. After approval, copy the client ID and secret into the local environment.
 
