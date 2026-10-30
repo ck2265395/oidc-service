@@ -185,7 +185,7 @@ test('application service derives ownership from the caller and waits for approv
 
 test('application service refuses groups owned by another account', async () => {
   const repository = new MemoryRepository();
-  const service = new ApplicationService(repository, 'production', () => 'app-id', () => 'client-id');
+  const service = new ApplicationService(repository, 'production', () => 'app-id', () => 'client-id', Buffer.alloc(32, 7).toString('base64url'));
   const groupId = 'a23e4567-e89b-42d3-a456-426614174000';
   repository.groups.add('owner-b:' + groupId);
 
