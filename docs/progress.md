@@ -6,8 +6,8 @@ This page records public-safe implementation status. Detailed product requiremen
 
 ## Implemented
 
-- Strict configuration validation, protected key generation, administrator password hashing, request IDs, safe error responses, browser security headers, and GitHub Actions checks.
-- Read-only account lookup, legacy password verification, credential-version checks, stable sector-specific subjects, and scope-limited claims.
+- Strict configuration validation, protected key generation, administrator password hashing, request IDs, safe error responses, browser security headers, dependency-aware readiness checks, and GitHub Actions checks.
+- Read-only account lookup, legacy password verification, credential-version checks, stable sector-specific subjects, scope-limited claims, and atomic Redis login-identifier/source-IP throttles.
 - Revision-checked application drafts, owner-scoped listing and editing, approval snapshots, and transactional review history.
 - Web client secrets encrypted with AES-GCM, returned once during creation, and rotated with revision checks. Provider client cache is cleared locally after review and rotation.
 - Upstream oidc-provider startup with persistent RS256 signing keys, S256 PKCE, authorization-code grants, and openid/profile/email scopes.
@@ -18,8 +18,8 @@ This page records public-safe implementation status. Detailed product requiremen
 
 ## Not yet accepted end to end
 
-- No live PostgreSQL or Redis deployment has been connected. The GitHub CI suite validates types, lint, existing unit/HTTP tests, and build only.
-- Redis-backed cross-instance replay/session state and client-cache invalidation are incomplete. Disablement or key rotation across multiple service instances requires integration work.
+- No live PostgreSQL or Redis deployment has been connected. Redis rate-limit behavior has unit coverage, while database roles, full protocol persistence, and multi-instance behavior still need live integration tests.
+- Redis-backed cross-instance replay/session state and client-cache invalidation are incomplete. Login throttling uses hashed identifier and direct peer address; trusted-proxy address configuration and account-alias aggregation remain to be completed.
 - Contact email verification, portal sign-in flow, and full usability/accessibility acceptance for the initial developer UI remain incomplete; approved or disabled application groups cannot be renamed, and groups cannot be deleted.
 - The administrator audit currently records application reviews and user grant revocations; other operational events and audit retention cleanup are incomplete.
 - Web/native relying-party examples, container packaging, deployment/upgrade guidance, and a complete protocol acceptance matrix remain incomplete.
