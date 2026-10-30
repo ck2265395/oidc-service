@@ -87,6 +87,7 @@ export function createDeveloperRouter(
 ): Router {
   const router = Router();
   router.use(express.json({ limit: '32kb' }));
+  router.use(express.urlencoded({ extended: false, limit: '4kb', parameterLimit: 4 }));
 
   const authenticatedOwner = async (request: Request, response: Response): Promise<string | null> => {
     try {
@@ -181,8 +182,25 @@ export function createDeveloperRouter(
     }
   });
 
-  router.get('/verify-email', async (request, response) => {
+  router.get('/verify-email', (request, response) => {
     const token = scalar(request.query.token);
+    if (!emailVerification || !token || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+      return response.status(400).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Email verification · DT Identity</title><h1>Verification link is invalid or expired</h1></html>');
+    }
+    response.type('html').send(
+      '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<title>Confirm email · DT Identity</title><main><h1>Confirm your contact email</h1>' +
+      '<p>Continue to verify the contact email on your developer profile.</p>' +
+      '<form method="post" action="/api/v1/developer/verify-email"><input type="hidden" name="token" value="' + token +
+      '"><button type="submit">Verify email</button></form></main></html>',
+    );
+  });
+
+  router.post('/verify-email', async (request, response) => {
+    if (request.header('origin') !== new URL(issuer).origin) {
+      return response.status(403).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Denied · DT Identity</title><h1>Request origin is not allowed</h1></html>');
+    }
+    const token = scalar(body(request).token);
     if (!emailVerification || !token) {
       return response.status(400).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Email verification · DT Identity</title><h1>Verification link is invalid or expired</h1></html>');
     }
