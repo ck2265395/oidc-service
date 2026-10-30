@@ -8,7 +8,7 @@ export function createApplication(_config: ServiceConfig): Express {
   const app = express();
 
   app.disable('x-powered-by');
-  app.use((request, response, next) => {
+  app.use((_request, response, next) => {
     const requestId = randomUUID();
     response.locals.requestId = requestId;
     response.setHeader('X-Request-Id', requestId);
@@ -30,7 +30,7 @@ export function createApplication(_config: ServiceConfig): Express {
     });
   });
 
-  const errors: ErrorRequestHandler = (error: unknown, _request, response, _next) => {
+  const errors: ErrorRequestHandler = (_error: unknown, _request, response, _next) => {
     // Never send error details or request data to the client.
     response.status(500).json({
       error: 'internal_error',
