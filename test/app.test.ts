@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import test from 'node:test';
 import { createServer } from 'node:http';
 
@@ -10,7 +11,7 @@ const config = loadConfig({
   issuer: 'https://identity.example.test',
   port: 3000,
   secrets: {
-    legacyHmacKey: 'l'.repeat(48),
+    legacyHmacKey: randomBytes(32).toString('base64url'),
     cookie: 'c'.repeat(48),
     fingerprint: 'f'.repeat(48),
     subject: 's'.repeat(48),
