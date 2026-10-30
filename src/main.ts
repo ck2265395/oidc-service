@@ -158,7 +158,7 @@ export async function start(): Promise<void> {
         [event.requestId, action, event.outcome, details, event.clientId],
       );
     };
-    const userApi = createUserApiRouter(provider, accounts);
+    const userApi = createUserApiRouter(provider, accounts, config.profilePictureBaseUrl);
     const server = createServer(createApplication(config, provider, interactions, developer, admin, userPortal, readiness, recordProtocolEvent, userApi));
 
     await new Promise<void>((resolve, reject) => {
