@@ -59,7 +59,24 @@ function urlAt(value: unknown, path: string, protocols: string[]): string {
   }
 
   if (!protocols.includes(url.protocol) || url.username || url.password) {
-    throw new ConfigError(`${path} must use an allowed URL scheme without embedded credentials`);
+    throw new ConfigError(`${path} must use an allowed URL scheme (${protocols.join(', ')}) without embedded credentials`);
+  }
+
+  return raw;
+}
+
+function databaseUrlAt(value: unknown, path: string): string {
+  const raw = stringAt(value, path);
+  let url: URL;
+
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new ConfigError(`${path} must be a valid PostgreSQL URL`);
+  }
+
+  if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname || !url.pathname || !url.username || !url.password) {
+    throw new ConfigError(`${path} must include a PostgreSQL host, database, and credentials`);
   }
 
   return raw;
@@ -125,8 +142,8 @@ export function loadConfig(input: unknown): ServiceConfig {
     secrets,
     admin: { username, passwordHash },
     databases: {
-      oidc: urlAt(databases.oidc, 'databases.oidc', ['postgres:', 'postgresql:']),
-      accounts: urlAt(databases.accounts, 'databases.accounts', ['postgres:', 'postgresql:']),
+      oidc: databaseUrlAt(databases.oidc, 'databases.oidc'),
+      accounts: databaseUrlAt(databases.accounts, 'databases.accounts'),
     },
     redisUrl: urlAt(root.redisUrl, 'redisUrl', ['redis:', 'rediss:']),
   };
