@@ -1,4 +1,8 @@
-import type { ApplicationDraft, ClientType } from './applications.js';
+import { randomUUID } from 'node:crypto';
+
+import { validateApplicationDraft, type ApplicationDraft, type ClientType, type RuntimeEnvironment } from './applications.js';
+import { randomToken } from './security.js';
+import type { ApplicationRepository, ApplicationPage } from './store.js';
 
 export type ApplicationStatus = 'draft' | 'pending' | 'rejected' | 'approved' | 'disabled';
 
@@ -160,4 +164,102 @@ export function reviewApplication(
     status: 'disabled',
     disabledReason: reason ?? null,
   };
+}
+
+export class ApplicationService {
+  constructor(
+    private readonly repository: ApplicationRepository,
+    private readonly environment: RuntimeEnvironment,
+    private readonly makeId: () => string = randomUUID,
+    private readonly makeClientId: () => string = () => randomToken(32),
+  ) {}
+
+  async create(ownerUuid: string, type: ClientType, input: unknown): Promise<ApplicationRecord> {
+    if (!ownerUuid || ownerUuid.length > 255) throw new ApplicationConflictError();
+    const draft = validateApplicationDraft(input, type, this.environment);
+    await this.assertGroupOwner(ownerUuid, draft.groupId);
+
+    const record = createApplicationRecord({
+      id: this.makeId(),
+      ownerUuid,
+      clientId: this.makeClientId(),
+      type,
+      draft,
+    });
+    await this.repository.createApplication(record);
+    return record;
+  }
+
+  async getOwned(id: string, ownerUuid: string): Promise<ApplicationRecord | null> {
+    return this.repository.getOwnedApplication(id, ownerUuid);
+  }
+
+  async edit(
+    id: string,
+    ownerUuid: string,
+    expectedRevision: number,
+    input: unknown,
+  ): Promise<ApplicationRecord | null> {
+    const current = await this.repository.getOwnedApplication(id, ownerUuid);
+    if (!current) return null;
+
+    const draft = validateApplicationDraft(input, current.type, this.environment);
+    await this.assertGroupOwner(ownerUuid, draft.groupId);
+    const next = replaceApplicationDraft(current, expectedRevision, draft);
+    const saved = await this.repository.compareAndSwap(current, next);
+    if (!saved) throw new ApplicationConflictError();
+    return next;
+  }
+
+  async submit(
+    id: string,
+    ownerUuid: string,
+    expectedRevision: number,
+  ): Promise<ApplicationRecord | null> {
+    const current = await this.repository.getOwnedApplication(id, ownerUuid);
+    if (!current) return null;
+
+    await this.assertGroupOwner(ownerUuid, current.draft.groupId);
+    const next = submitApplicationForReview(current, expectedRevision);
+    const saved = await this.repository.compareAndSwap(current, next);
+    if (!saved) throw new ApplicationConflictError();
+    return next;
+  }
+
+  async review(
+    id: string,
+    expectedRevision: number,
+    command: ReviewCommand,
+  ): Promise<ApplicationRecord | null> {
+    const current = await this.repository.getApplication(id);
+    if (!current) return null;
+
+    const next = reviewApplication(current, expectedRevision, command);
+    const saved = await this.repository.compareAndSwap(current, next, next.lastReview);
+    if (!saved) throw new ApplicationConflictError();
+    return next;
+  }
+
+  async activeClient(clientId: string): Promise<{ record: ApplicationRecord; config: ApplicationDraft } | null> {
+    const record = await this.repository.getApplicationByClientId(clientId);
+    if (!record) return null;
+    const config = effectiveApplicationConfig(record);
+    if (!config) return null;
+    return { record, config };
+  }
+
+  async listOwned(
+    ownerUuid: string,
+    page = 1,
+    pageSize = 20,
+    status?: ApplicationStatus,
+  ): Promise<ApplicationPage> {
+    return this.repository.listOwned(ownerUuid, page, pageSize, status);
+  }
+
+  private async assertGroupOwner(ownerUuid: string, groupId: string | null): Promise<void> {
+    if (groupId === null) return;
+    const belongsToOwner = await this.repository.groupOwnedBy(ownerUuid, groupId);
+    if (!belongsToOwner) throw new ApplicationConflictError();
+  }
 }
