@@ -15,7 +15,10 @@ All application APIs require an active OIDC provider session. Successful respons
 Errors use the same shape with a stable nonzero code and an appropriate HTTP status. Responses include no-store headers.
 
 ## Current user profile
-\n- `GET /api/v1/me` requires the current identity-service session and rechecks account status and credential version. It returns only nickname, masked email, and a safe HTTPS picture URL when available; it never returns internal account identifiers. Relative picture paths are omitted unless `profilePictureBaseUrl` is configured.\n\n## Developer profile
+
+- `GET /api/v1/me` requires the current identity-service session and rechecks account status and credential version. It returns only nickname, masked email, and a safe HTTPS picture URL when available; it never returns internal account identifiers. Relative picture paths are omitted unless `profilePictureBaseUrl` is configured.
+
+## Developer profile
 
 First request a CSRF token:
 
@@ -62,7 +65,7 @@ Mutating requests require the exact configured issuer origin and the CSRF token 
 
 ## User and administrator pages
 
-- `GET /portal/authorizations` lists the current user’s nonexpired grants. Revocation uses a CSRF-protected same-origin form.
+- `GET /portal/authorizations` lists the current user’s nonexpired grants, including scope, status, and authorization time. `GET /portal/authorizations/:id/confirm-revoke` shows the application and requested scope before the user confirms; revocation then uses a CSRF-protected same-origin POST form.
 - `GET /admin/login` starts the separate administrator session flow.
 - `GET /admin/applications` and `GET /admin/groups` show review queues.
 - `GET /admin/audit` supports `applicationId`, `from`, `to`, `action`, `outcome`, and `page` filters. Dates use UTC; `to` includes the full day.
