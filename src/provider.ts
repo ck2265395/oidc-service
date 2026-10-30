@@ -45,7 +45,7 @@ export function createProvider(
         accountId,
         claims: async (_use, scope) => ({
           sub: identity.sub,
-          ...claimsForScopes(identity, new Set(scope.split(/\\s+/).filter(Boolean))),
+          ...claimsForScopes(identity, new Set(scope.split(/\s+/).filter(Boolean))),
         }),
       };
     },
