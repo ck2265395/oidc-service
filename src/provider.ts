@@ -49,6 +49,16 @@ export function createProvider(
         }),
       };
     },
+    clientBasedCORS: (_ctx, origin, client) => {
+      if (client.tokenEndpointAuthMethod !== 'none' || client.applicationType !== 'web' || !client.clientUri) {
+        return false;
+      }
+      try {
+        return new URL(origin).origin === new URL(client.clientUri).origin;
+      } catch {
+        return false;
+      }
+    },
     interactions: {
       url: (_ctx, interaction) => `/interaction/${interaction.uid}`,
     },
