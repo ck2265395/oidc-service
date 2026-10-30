@@ -4,7 +4,7 @@ import express, { type Request, type Response, Router } from 'express';
 import type Provider from 'oidc-provider';
 
 import { AccountService, type LoginType } from './accounts.js';
-import { accountHandle } from './provider.js';
+import { accountHandle, PORTAL_CLIENT_ID } from './provider.js';
 import type { ApplicationService } from './platform.js';
 import { LoginRateLimitError, type RedisLoginRateLimiter } from './login-limiter.js';
 import { escapeHtml } from './security.js';
@@ -113,12 +113,14 @@ export function createInteractionRouter(
       if (details.uid !== request.params.uid) return errorPage(response);
       const clientId = stringParam(details.params.client_id);
       if (!clientId) return errorPage(response);
-      const active = await applications.activeClient(clientId);
-      if (!active) return errorPage(response);
+      const isPortalClient = clientId === PORTAL_CLIENT_ID;
+      const active = isPortalClient ? null : await applications.activeClient(clientId);
+      if (!isPortalClient && !active) return errorPage(response);
 
+      const clientName = active?.config.name ?? 'DT Identity';
       const csrf = setCsrf(response, details.uid, csrfKey, secureCookies);
       if (details.prompt.name === 'login') {
-        const form = '<p class="muted">继续使用 ' + escapeHtml(active.config.name) + ' 登录</p>' +
+        const form = '<p class="muted">继续使用 ' + escapeHtml(clientName) + ' 登录</p>' +
           '<form method="post" action="/interaction/' + encodeURIComponent(details.uid) + '/login">' +
           '<input type="hidden" name="csrf" value="' + escapeHtml(csrf) + '">' +
           '<label for="identifierType">登录方式</label><select id="identifierType" name="identifierType">' +
@@ -130,9 +132,11 @@ export function createInteractionRouter(
       }
 
       if (details.prompt.name === 'consent') {
-        const scopes = requestedScopes(details.params.scope, active.config.scopes);
+        const scopes = requestedScopes(details.params.scope, active?.config.scopes ?? ['openid', 'profile', 'email']);
         if (!scopes) return errorPage(response);
-        const developer = await applications.getDeveloperProfile(active.record.ownerUuid);
+        const developer = active
+          ? await applications.getDeveloperProfile(active.record.ownerUuid)
+          : { displayName: 'DT Identity' };
         if (!developer) return errorPage(response);
         const scopeNames: Record<string, string> = {
           openid: '识别你的身份',
@@ -140,12 +144,12 @@ export function createInteractionRouter(
           email: '邮箱地址',
         };
         const list = scopes.map((scope) => '<li>' + escapeHtml(scopeNames[scope] ?? scope) + '</li>').join('');
-        const form = '<p><strong>' + escapeHtml(active.config.name) + '</strong> 请求以下权限：</p>' +
+        const form = '<p><strong>' + escapeHtml(clientName) + '</strong> 请求以下权限：</p>' +
           '<dl><dt>开发者</dt><dd>' + escapeHtml(developer.displayName) + '</dd>' +
-          '<dt>用途</dt><dd>' + escapeHtml(active.config.purpose) + '</dd></dl>' +
-          '<p><a href="' + escapeHtml(active.config.homepageUrl) + '" target="_blank" rel="noopener noreferrer">应用主页</a> · ' +
-          '<a href="' + escapeHtml(active.config.privacyUrl) + '" target="_blank" rel="noopener noreferrer">隐私政策</a> · ' +
-          '<a href="' + escapeHtml(active.config.termsUrl) + '" target="_blank" rel="noopener noreferrer">服务条款</a></p>' +
+          (active ? '<dt>用途</dt><dd>' + escapeHtml(active.config.purpose) + '</dd></dl>' +
+            '<p><a href="' + escapeHtml(active.config.homepageUrl) + '" target="_blank" rel="noopener noreferrer">应用主页</a> · ' +
+            '<a href="' + escapeHtml(active.config.privacyUrl) + '" target="_blank" rel="noopener noreferrer">隐私政策</a> · ' +
+            '<a href="' + escapeHtml(active.config.termsUrl) + '" target="_blank" rel="noopener noreferrer">服务条款</a></p>' : '</dl>') +
           '<ul>' + list + '</ul>' +
           '<form method="post" action="/interaction/' + encodeURIComponent(details.uid) + '/consent">' +
           '<input type="hidden" name="csrf" value="' + escapeHtml(csrf) + '">' +
@@ -215,9 +219,10 @@ export function createInteractionRouter(
       const accountId = details.session?.accountId;
       const clientId = stringParam(details.params.client_id);
       if (!accountId || !clientId) return errorPage(response);
-      const active = await applications.activeClient(clientId);
-      if (!active) return errorPage(response);
-      const scopes = requestedScopes(details.params.scope, active.config.scopes);
+      const isPortalClient = clientId === PORTAL_CLIENT_ID;
+      const active = isPortalClient ? null : await applications.activeClient(clientId);
+      if (!isPortalClient && !active) return errorPage(response);
+      const scopes = requestedScopes(details.params.scope, active?.config.scopes ?? ['openid', 'profile', 'email']);
       if (!scopes) return errorPage(response);
       const grant = new provider.Grant({ accountId, clientId });
       grant.addOIDCScope(scopes);
