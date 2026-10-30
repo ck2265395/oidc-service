@@ -13,7 +13,7 @@
 
 包含只读账号认证、OIDC 登录和授权同意交互、用户授权撤销页、开发者 API 与 `/developer` 双语界面、AES-GCM 加密的 Web 客户端密钥生成与轮换，以及独立管理员应用/应用组审核页面、操作审计和状态统计。开发者界面支持开发者资料、应用草稿、审核提交、应用组管理和密钥轮换；未登录时可从页面直接进入门户登录。已批准的 SPA/native 客户端使用公开客户端认证。
 
-服务首页 `/`、开发者中心 `/developer` 与门户授权页 `/portal/authorizations` 已提供；门户使用 OIDC Authorization Code + PKCE 登录。联系邮箱验证、跨实例客户端缓存失效、真实数据库端到端验证、Web/native 接入示例、容器与运维交付仍待完成。API 路由见 [docs/api.md](docs/api.md)，实施限制见 [docs/progress.md](docs/progress.md)。
+服务首页 `/`、开发者中心 `/developer` 与门户授权页 `/portal/authorizations` 已提供；门户使用 OIDC Authorization Code + PKCE 登录。联系邮箱验证、跨实例缓存失效的实环境验收、真实数据库端到端验证、Web/native 接入示例、容器与运维交付仍待完成。API 路由见 [docs/api.md](docs/api.md)，实施限制见 [docs/progress.md](docs/progress.md)。
 
 ## 检查
 
