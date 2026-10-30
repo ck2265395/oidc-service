@@ -223,3 +223,23 @@ export function claimsForScopes(
   }
   return claims;
 }
+export function safeProfilePictureUrl(value: string | null, baseUrl: string | null): string | null {
+  if (!value || value.length > 1024 || value.trim() !== value) return null;
+  try {
+    const absolute = new URL(value);
+    if (absolute.protocol !== 'https:' || !absolute.hostname || absolute.username || absolute.password) return null;
+    return absolute.toString();
+  } catch {
+    if (!baseUrl || value.startsWith('//') || /[?#\\\\]/.test(value)) return null;
+    const path = value.replace(/^\\/+/, '');
+    if (!path || path.split('/').some((part) => part === '.' || part === '..')) return null;
+    try {
+      const base = new URL(baseUrl.endsWith('/') ? baseUrl : baseUrl + '/');
+      const picture = new URL(path, base);
+      if (picture.origin !== base.origin || !picture.pathname.startsWith(base.pathname)) return null;
+      return picture.toString();
+    } catch {
+      return null;
+    }
+  }
+}
