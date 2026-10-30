@@ -19,6 +19,7 @@ export function createApplication(
   const publicDirectory = resolve(process.cwd(), 'public');
 
   app.disable('x-powered-by');
+  app.set('trust proxy', config.trustedProxyCidrs);
   app.use((_request, response, next) => {
     const requestId = randomUUID();
     response.locals.requestId = requestId;
