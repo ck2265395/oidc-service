@@ -34,9 +34,15 @@ export class RedisLoginRateLimiter {
     private readonly ipLimit = 100,
   ) {}
 
-  async consume(loginType: 'username' | 'email', identifier: string, sourceAddress: string): Promise<void> {
+  async consume(
+    accountUuid: string | null,
+    loginType: 'username' | 'email',
+    identifier: string,
+    sourceAddress: string,
+  ): Promise<void> {
     const normalizedIdentifier = loginType + ':' + identifier.trim().toLocaleLowerCase('en-US');
-    const accountKey = 'dt:auth:account:' + this.digest(normalizedIdentifier);
+    const subject = accountUuid ? 'account:' + accountUuid : 'identifier:' + normalizedIdentifier;
+    const accountKey = 'dt:auth:account:' + this.digest(subject);
     const ipKey = 'dt:auth:ip:' + this.digest(sourceAddress || 'unknown');
     const result = await this.redis.eval(INCREMENT_SCRIPT, {
       keys: [accountKey, ipKey],
