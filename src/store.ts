@@ -28,6 +28,13 @@ export interface ApplicationPage {
 }
 
 export interface ApplicationRepository {
+  getDeveloperProfile?(accountUuid: string): Promise<DeveloperProfileRecord | null>;
+  saveDeveloperProfile?(
+    accountUuid: string,
+    displayName: string,
+    contactEmail: string,
+    expectedRevision: number,
+  ): Promise<DeveloperProfileRecord | null>;
   createApplication(record: ApplicationRecord, encryptedClientSecret?: string | null): Promise<void>;
   getEncryptedClientSecret?(clientId: string): Promise<string | null>;
   rotateEncryptedClientSecret?(
