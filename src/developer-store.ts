@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { PoolClient, QueryResult } from 'pg';
 
+import type { DeveloperCredential } from './developer-auth-service.js';
 import type { DeveloperAccount, PasswordDigest } from './developer-identity.js';
 
 interface Queryable {
@@ -91,5 +92,26 @@ export class PostgresDeveloperStore {
     );
     const row = result.rows[0];
     return row ? mapAccount(row) : null;
+  }
+
+  async findCredentialByEmail(emailNormalized: string): Promise<DeveloperCredential | null> {
+    const result = await this.pool.query<{
+      developer_id: string;
+      email_normalized: string;
+      password_digest: PasswordDigest | string;
+      status: string;
+    }>(
+      'SELECT c.developer_id, c.email_normalized, c.password_digest, a.status FROM developer_password_credential c JOIN developer_account a ON a.id = c.developer_id WHERE c.email_normalized = $1 LIMIT 1',
+      [emailNormalized],
+    );
+    const row = result.rows[0];
+    if (!row || !['unsubmitted', 'pending', 'approved', 'rejected', 'disabled'].includes(row.status)) return null;
+    const digest = typeof row.password_digest === 'string' ? JSON.parse(row.password_digest) as PasswordDigest : row.password_digest;
+    return {
+      developerId: row.developer_id,
+      emailNormalized: row.email_normalized,
+      passwordDigest: digest,
+      status: row.status as DeveloperCredential['status'],
+    };
   }
 }
