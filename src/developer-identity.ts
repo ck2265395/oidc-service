@@ -1,11 +1,18 @@
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
-import { promisify } from 'node:util';
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual, type ScryptOptions } from 'node:crypto';
 
-const scrypt = promisify(scryptCallback);
 const SCRYPT_N = 32_768;
 const SCRYPT_R = 8;
 const SCRYPT_P = 1;
 const SCRYPT_BYTES = 64;
+
+function scrypt(password: string, salt: Buffer, keyLength: number, options: ScryptOptions): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scryptCallback(password, salt, keyLength, options, (error, derivedKey) => {
+      if (error) reject(error);
+      else resolve(derivedKey);
+    });
+  });
+}
 
 export type DeveloperStatus = 'unsubmitted' | 'pending' | 'approved' | 'rejected' | 'disabled';
 export type DeveloperReviewAction = 'submit' | 'approve' | 'reject' | 'disable' | 'restore';
