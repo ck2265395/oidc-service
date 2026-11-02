@@ -75,3 +75,32 @@ test('resolves a migrated developer by its MOONDROP external subject', async () 
   assert.equal(account?.id, '11111111-1111-4111-8111-111111111111');
   assert.equal(account?.status, 'approved');
 });
+
+test('creates an unsubmitted developer identity for a verified MOONDROP subject atomically', async () => {
+  const statements: string[] = [];
+  const client = {
+    async query(sql: string) {
+      statements.push(sql);
+      if (sql.startsWith('INSERT INTO developer_account')) return { rows: [{ id: '11111111-1111-4111-8111-111111111111', status: 'unsubmitted', revision: 1, last_review: null, submitted_at: null, approved_at: null }], rowCount: 1 };
+      return { rows: [], rowCount: 1 };
+    }, release() {},
+  };
+  const store = new PostgresDeveloperStore({ async connect() { return client; } } as never, () => '11111111-1111-4111-8111-111111111111');
+
+  const account = await store.createExternalAccount('moondrop', 'account-subject');
+
+  assert.equal(account.status, 'unsubmitted');
+  assert.ok(statements.some((sql) => sql.startsWith('INSERT INTO developer_external_identity')));
+  assert.equal(statements.at(-1), 'COMMIT');
+});
+
+test('binds a verified MOONDROP subject to an existing developer without merging by email', async () => {
+  const calls: Array<{ sql: string; values?: readonly unknown[] }> = [];
+  const pool = { async query(sql: string, values?: readonly unknown[]) { calls.push(values === undefined ? { sql } : { sql, values }); return { rows: [], rowCount: 1 }; } };
+  const store = new PostgresDeveloperStore(pool as never);
+
+  await store.bindExternalIdentity('11111111-1111-4111-8111-111111111111', 'moondrop', 'account-subject');
+
+  assert.match(calls[0]?.sql ?? '', /^INSERT INTO developer_external_identity/);
+  assert.deepEqual(calls[0]?.values?.slice(1), ['11111111-1111-4111-8111-111111111111', 'moondrop', 'account-subject']);
+});

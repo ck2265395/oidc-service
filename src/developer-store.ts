@@ -181,6 +181,44 @@ export class PostgresDeveloperStore {
     return row ? mapAccount(row) : null;
   }
 
+  async createExternalAccount(provider: 'moondrop', subject: string): Promise<DeveloperAccount> {
+    if (!subject || subject.length > 255) throw new TypeError('External identity is invalid');
+    const client = await this.pool.connect();
+    const developerId = this.createId();
+    try {
+      await client.query('BEGIN');
+      const created = await client.query<AccountRow>(
+        "INSERT INTO developer_account (id, status) VALUES ($1, 'unsubmitted') RETURNING id, status, revision, last_review, submitted_at, approved_at",
+        [developerId],
+      );
+      const account = created.rows[0];
+      if (!account) throw new Error('Developer account could not be created');
+      await client.query(
+        'INSERT INTO developer_profile (account_uuid, developer_id, display_name, contact_email, contact_email_verified, purpose) VALUES ($1, $1, $2, $3, false, $4)',
+        [developerId, 'MOONDROP 开发者', '', ''],
+      );
+      await client.query(
+        'INSERT INTO developer_external_identity (id, developer_id, provider, subject) VALUES ($1, $2, $3, $4)',
+        [this.createId(), developerId, provider, subject],
+      );
+      await client.query('COMMIT');
+      return mapAccount(account);
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async bindExternalIdentity(developerId: string, provider: 'moondrop', subject: string): Promise<void> {
+    if (!subject || subject.length > 255) throw new TypeError('External identity is invalid');
+    await this.pool.query(
+      'INSERT INTO developer_external_identity (id, developer_id, provider, subject) VALUES ($1, $2, $3, $4)',
+      [this.createId(), developerId, provider, subject],
+    );
+  }
+
   async submitReview(developerId: string, expectedRevision: number): Promise<DeveloperAccount> {
     return this.changeReviewStatus(developerId, expectedRevision, 'submit', null, null);
   }
