@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { DeveloperStatus } from './developer-identity.js';
 
 export type ApplicationGroupStatus = 'pending' | 'approved' | 'rejected' | 'disabled';
 
@@ -48,8 +49,9 @@ export class ApplicationGroupService {
     private readonly makeId: () => string = randomUUID,
   ) {}
 
-  async create(ownerUuid: string, displayName: unknown): Promise<ApplicationGroupRecord> {
+  async create(ownerUuid: string, displayName: unknown, developerStatus: DeveloperStatus = 'approved'): Promise<ApplicationGroupRecord> {
     if (!ownerUuid || ownerUuid.length > 255) throw new ApplicationGroupError();
+    if (developerStatus !== 'approved') throw new ApplicationGroupError('Developer approval is required to create application groups');
     if (
       typeof displayName !== 'string' ||
       displayName.trim() !== displayName ||

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { validateApplicationDraft, type ApplicationDraft, type ClientType, type RuntimeEnvironment } from './applications.js';
+import type { DeveloperStatus } from './developer-identity.js';
 import { decryptSecret, encryptSecret, randomToken } from './security.js';
 import type { ApplicationRepository, ApplicationPage } from './store.js';
 
@@ -247,8 +248,10 @@ export class ApplicationService {
     ownerUuid: string,
     type: ClientType,
     input: unknown,
+    developerStatus: DeveloperStatus = 'approved',
   ): Promise<{ record: ApplicationRecord; clientSecret: string | null }> {
     if (!ownerUuid || ownerUuid.length > 255) throw new ApplicationConflictError();
+    if (developerStatus !== 'approved') throw new ApplicationConflictError('Developer approval is required to create applications');
     if (type === 'web' && !this.encryptionKey) {
       throw new ApplicationConflictError('Confidential client secret storage is not configured');
     }

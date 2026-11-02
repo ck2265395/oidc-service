@@ -114,4 +114,42 @@ export class PostgresDeveloperStore {
       status: row.status as DeveloperCredential['status'],
     };
   }
+
+  async createSession(developerId: string, sessionHash: string, absoluteExpiresAt: Date): Promise<void> {
+    await this.pool.query(
+      'INSERT INTO developer_session (session_hash, developer_id, absolute_expires_at) VALUES ($1, $2, $3)',
+      [sessionHash, developerId, absoluteExpiresAt],
+    );
+  }
+
+  async touchSession(sessionHash: string): Promise<void> {
+    await this.pool.query(
+      "UPDATE developer_session SET last_activity = now() WHERE session_hash = $1 AND revoked_at IS NULL AND absolute_expires_at > now() AND last_activity > now() - interval '7 days'",
+      [sessionHash],
+    );
+  }
+
+  async revokeSession(sessionHash: string): Promise<void> {
+    await this.pool.query(
+      'UPDATE developer_session SET revoked_at = coalesce(revoked_at, now()) WHERE session_hash = $1',
+      [sessionHash],
+    );
+  }
+
+  async revokeAllSessions(developerId: string): Promise<void> {
+    await this.pool.query(
+      'UPDATE developer_session SET revoked_at = coalesce(revoked_at, now()) WHERE developer_id = $1',
+      [developerId],
+    );
+  }
+
+  async findByExternalIdentity(provider: 'moondrop', subject: string): Promise<DeveloperAccount | null> {
+    if (!subject || subject.length > 255) return null;
+    const result = await this.pool.query<AccountRow>(
+      'SELECT a.id, a.status, a.revision, a.last_review, a.submitted_at, a.approved_at FROM developer_external_identity e JOIN developer_account a ON a.id = e.developer_id WHERE e.provider = $1 AND e.subject = $2 LIMIT 1',
+      [provider, subject],
+    );
+    const row = result.rows[0];
+    return row ? mapAccount(row) : null;
+  }
 }

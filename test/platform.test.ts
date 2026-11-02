@@ -195,6 +195,17 @@ test('application service refuses groups owned by another account', async () => 
   );
 });
 
+test('application creation rejects developers whose qualification is not approved', async () => {
+  const repository = new MemoryRepository();
+  const service = new ApplicationService(repository, 'production', () => 'app-id', () => 'client-id', Buffer.alloc(32, 7).toString('base64url'));
+
+  await assert.rejects(
+    service.createWithSecret('developer-a', 'web', validDraft('Blocked'), 'unsubmitted'),
+    /approval/i,
+  );
+  assert.equal(repository.records.size, 0);
+});
+
 test('shared subjects wait for both application and group approval', async () => {
   const repository = new MemoryRepository();
   const service = new ApplicationService(repository, 'production', () => 'grouped-app', () => 'grouped-client', Buffer.alloc(32, 7).toString('base64url'));

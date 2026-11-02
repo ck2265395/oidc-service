@@ -65,3 +65,13 @@ test('rejects malformed session digests before querying PostgreSQL', async () =>
   assert.equal(await store.resolveSession('not-a-digest'), null);
   assert.equal(queried, false);
 });
+
+test('resolves a migrated developer by its MOONDROP external subject', async () => {
+  const pool = { async query() { return { rows: [{ id: '11111111-1111-4111-8111-111111111111', status: 'approved', revision: 1, last_review: null, submitted_at: null, approved_at: null }], rowCount: 1 }; } };
+  const store = new PostgresDeveloperStore(pool as never);
+
+  const account = await store.findByExternalIdentity('moondrop', 'legacy-account-uuid');
+
+  assert.equal(account?.id, '11111111-1111-4111-8111-111111111111');
+  assert.equal(account?.status, 'approved');
+});
