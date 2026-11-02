@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import { ConsoleApp } from './ConsoleApp';
 
@@ -33,4 +33,14 @@ test('developer registration uses email code and password without a phone field'
   expect(screen.getByLabelText('邮箱验证码')).toBeInTheDocument();
   expect(screen.getByLabelText('设置密码')).toBeInTheDocument();
   expect(screen.queryByLabelText('手机号')).not.toBeInTheDocument();
+});
+
+test('MOONDROP first login offers create or verified existing-account binding', async () => {
+  window.history.replaceState({}, '', '/developer/bind');
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ code: 0, desc: 'ok', data: { bound: false, account: null } }), { status: 200, headers: { 'content-type': 'application/json' } })));
+  render(<ConsoleApp />);
+
+  expect(await screen.findByRole('button', { name: '创建新的开发者身份' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '绑定已有开发者账号' })).toBeInTheDocument();
+  expect(screen.getByLabelText('开发者邮箱')).toBeInTheDocument();
 });

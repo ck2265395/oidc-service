@@ -22,6 +22,8 @@ export interface ServiceConfig {
     accounts: string;
   };
   redisUrl: string;
+  redisUsername: string | null;
+  redisPassword: string | null;
   trustedProxyCidrs: string[];
   loginRateLimit: { windowSeconds: number; accountAttempts: number; ipAttempts: number };
   smtp: { host: string; port: number; secure: boolean; user: string | null; password: string | null; from: string } | null;
@@ -91,9 +93,9 @@ function databaseUrlAt(value: unknown, path: string): string {
 }
 
 function legacyKeyAt(value: unknown, path: string): string {
-  const key = stringAt(value, path, 32);
-  if (new Set(key).size < 16 || /^(replace|change|example|your|set)[-_]/i.test(key)) {
-    throw new ConfigError(`${path} must be a strong key supplied by the existing account system`);
+  const key = stringAt(value, path, 12);
+  if (new Set(key).size < 8 || /^(replace|change|example|your|set)[-_]/i.test(key)) {
+    throw new ConfigError(`${path} must be the key supplied by the existing account system`);
   }
   return key;
 }
@@ -249,6 +251,12 @@ export function loadConfig(input: unknown): ServiceConfig {
       accounts: databaseUrlAt(databases.accounts, 'databases.accounts'),
     },
     redisUrl: urlAt(root.redisUrl, 'redisUrl', ['redis:', 'rediss:']),
+    redisUsername: root.redisUsername === undefined || root.redisUsername === null || root.redisUsername === ''
+      ? null
+      : stringAt(root.redisUsername, 'redisUsername'),
+    redisPassword: root.redisPassword === undefined || root.redisPassword === null || root.redisPassword === ''
+      ? null
+      : stringAt(root.redisPassword, 'redisPassword'),
     trustedProxyCidrs: trustedProxyCidrsAt(root.trustedProxyCidrs),
     loginRateLimit: rateLimitConfigAt(root.loginRateLimit),
     smtp: smtpConfigAt(root.smtp),

@@ -44,14 +44,18 @@ function ipKey(request: Request, secret: string): string {
 }
 
 function html(title: string, content: string): string {
-  return '<!doctype html><html lang="zh-CN"><meta charset="utf-8">' +
+  return '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<title>' + escapeHtml(title) + ' · DT 管理</title>' +
-    '<style>body{font:16px system-ui,sans-serif;max-width:58rem;margin:6vh auto;padding:0 1rem;color:#182235}' +
-    'main{border:1px solid #dce3ec;border-radius:12px;padding:1.5rem}label{display:block;margin:1rem 0 .35rem}' +
-    'input,select,textarea,button{font:inherit;padding:.65rem;box-sizing:border-box}input,textarea{width:100%}' +
-    'button{margin:.7rem .5rem .2rem 0;cursor:pointer}pre{white-space:pre-wrap;background:#f3f5f7;padding:1rem}</style>' +
-    '<main><nav><a href="/admin/applications">应用审核</a> · <a href="/admin/groups">应用组</a> · <a href="/admin/audit">操作审计</a> · <a href="/admin/statistics">统计</a></nav><h1>' + escapeHtml(title) + '</h1>' + content + '</main></html>';
+    '<title>' + escapeHtml(title) + ' · MOONDROP</title><link rel="icon" href="/assets/moondrop.ico">' +
+    '<style>:root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;color:#182133;background:#f4f6f9}' +
+    '*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:28px;background:radial-gradient(circle at 75% 15%,#e9efff,transparent 34%),#f4f6f9}' +
+    'main{width:min(440px,100%);background:#fff;border:1px solid #e1e6ee;border-radius:16px;padding:34px;box-shadow:0 25px 70px #26385c14}' +
+    'main:before{content:"";display:block;width:42px;height:42px;border-radius:10px;background:url(/assets/moondrop.ico) center/contain no-repeat}' +
+    'h1{font-size:25px;letter-spacing:-.04em;margin:22px 0 8px}nav{display:none}label{display:block;margin:18px 0 7px;color:#5d697d;font-size:12px}' +
+    'input,select,textarea,button{font:inherit;box-sizing:border-box}input,textarea{width:100%;border:1px solid #dce2eb;border-radius:8px;padding:12px;outline:none}' +
+    'input:focus,textarea:focus{border-color:#3157d5;box-shadow:0 0 0 3px #3157d512}button{width:100%;border:0;border-radius:8px;padding:12px;margin-top:20px;background:#3157d5;color:#fff;font-weight:700;cursor:pointer}' +
+    'p{color:#6f7b90;font-size:13px;line-height:1.65}a{color:#3157d5}pre{white-space:pre-wrap;background:#f3f5f7;padding:1rem}</style></head>' +
+    '<body><main><h1>' + escapeHtml(title) + '</h1>' + content + '</main></body></html>';
 }
 
 function sendError(response: Response, status: number, message: string): void {
@@ -59,7 +63,21 @@ function sendError(response: Response, status: number, message: string): void {
 }
 
 function requestOriginAllowed(request: Request, issuer: string): boolean {
-  return request.header('origin') === new URL(issuer).origin;
+  const expected = new URL(issuer).origin;
+  const origin = request.header('origin');
+  if (origin && origin !== 'null') return origin === expected;
+  if (origin === 'null') return request.header('sec-fetch-site') === 'same-origin';
+
+  const referer = request.header('referer');
+  if (referer) {
+    try {
+      return new URL(referer).origin === expected;
+    } catch {
+      return false;
+    }
+  }
+
+  return request.header('sec-fetch-site') === 'same-origin';
 }
 
 export function createAdminRouter(
@@ -123,9 +141,9 @@ export function createAdminRouter(
   router.get('/login', (_request, response) => {
     const csrf = csrfPageToken(response);
     const form = '<form method="post" action="/admin/login"><input type="hidden" name="csrf" value="' +
-      escapeHtml(csrf) + '"><label for="username">管理员账号</label><input id="username" name="username" required maxlength="128" autocomplete="username">' +
+      escapeHtml(csrf) + '"><p>使用平台管理员凭据登录统一身份控制台。</p><label for="username">管理员账号</label><input id="username" name="username" required maxlength="128" autocomplete="username">' +
       '<label for="password">管理员密码</label><input id="password" type="password" name="password" required maxlength="1024" autocomplete="current-password">' +
-      '<button type="submit">登录</button></form>';
+      '<button type="submit">登录管理后台</button></form>';
     response.type('html').send(html('管理员登录', form));
   });
 
@@ -396,7 +414,7 @@ export function createAdminRouter(
         'FROM platform_audit p LEFT JOIN oidc_application a ON a.id = p.application_id ' +
         "WHERE p.action LIKE 'protocol.%' AND p.created_at >= now() - ($1::int * interval '1 day') " +
         'AND ($2::uuid IS NULL OR p.application_id = $2::uuid) ' +
-        'GROUP BY coalesce(a.draft_config->>'name', '平台门户或未知客户端'), p.application_id, p.action, p.outcome ORDER BY count(*) DESC LIMIT 500',
+        "GROUP BY coalesce(a.draft_config->>'name', '平台门户或未知客户端'), p.application_id, p.action, p.outcome ORDER BY count(*) DESC LIMIT 500",
         [days, applicationId || null],
       );
       const rows = result.rows.map((row) =>

@@ -1,5 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
+
+import { apiGet, developerMutation } from '../api';
 
 async function post(path: string, body: unknown): Promise<void> {
   const response = await fetch(path, {
@@ -46,4 +48,30 @@ export function DeveloperRegister() {
     catch (error) { setMessage(error instanceof Error ? error.message : '注册失败'); }
   };
   return <AuthLayout title="注册开发者账号" subtitle="邮箱验证成功后即可完善开发者资料并提交审核。"><form className="developer-auth-form" onSubmit={submit}><label>邮箱<input name="email" type="email" autoComplete="email" required /></label><label>邮箱验证码<span className="code-input"><input name="code" inputMode="numeric" pattern="[0-9]{6}" required /><button type="button" onClick={(event) => void sendCode(event.currentTarget.form!)}>获取验证码</button></span></label><label>设置密码<input name="password" type="password" minLength={10} autoComplete="new-password" required /></label><small>至少 10 位，并包含大写字母、小写字母、数字或符号中的三类。</small><button className="button primary" type="submit">注册并继续</button><span role="status">{message}</span></form><p className="auth-switch">已有开发者账号？<Link to="/developer/login">返回登录</Link></p></AuthLayout>;
+}
+
+export function DeveloperBinding() {
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  useEffect(() => {
+    apiGet<{ bound: boolean }>('/api/v1/developer/moondrop/status').then(async ({ bound }) => {
+      if (bound) {
+        await developerMutation('/api/v1/developer/moondrop/create', 'POST', {});
+        window.location.assign('/developer/console/overview');
+      }
+    }).catch((error: unknown) => setMessage(error instanceof Error ? error.message : '水月雨账号状态获取失败')).finally(() => setLoading(false));
+  }, []);
+  const create = async () => {
+    setMessage('正在创建开发者身份…');
+    try { await developerMutation('/api/v1/developer/moondrop/create', 'POST', {}); window.location.assign('/developer/console/profile'); }
+    catch (error) { setMessage(error instanceof Error ? error.message : '创建失败'); }
+  };
+  const bind = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); const values = new FormData(event.currentTarget); setMessage('正在验证并绑定…');
+    try {
+      await developerMutation('/api/v1/developer/moondrop/bind', 'POST', { email: values.get('email'), password: values.get('password') });
+      window.location.assign('/developer/console/overview');
+    } catch (error) { setMessage(error instanceof Error ? error.message : '绑定失败'); }
+  };
+  return <AuthLayout title="关联开发者身份" subtitle="水月雨账号已验证。请选择创建新身份，或再次验证已有开发者账号后完成绑定。">{loading ? <p>正在确认账号状态…</p> : <><button className="button primary" type="button" onClick={() => void create()}>创建新的开发者身份</button><div className="auth-divider"><span>或者</span></div><form className="developer-auth-form" onSubmit={bind}><label>开发者邮箱<input name="email" type="email" autoComplete="username" required /></label><label>开发者密码<input name="password" type="password" autoComplete="current-password" required /></label><button className="button secondary" type="submit">绑定已有开发者账号</button></form><span role="status">{message}</span></>}</AuthLayout>;
 }

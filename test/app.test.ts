@@ -3,6 +3,8 @@ import { randomBytes } from 'node:crypto';
 import test from 'node:test';
 import { createServer } from 'node:http';
 
+import express from 'express';
+
 import { createApplication } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 
@@ -61,6 +63,30 @@ test('unknown routes do not reveal internal error details', async (context) => {
   assert.deepEqual(Object.keys(body).sort(), ['error', 'requestId']);
   assert.equal(body.error, 'not_found');
 });
+
+test('console routes serve the frontend shell without shadowing API routes', async (context) => {
+  const server = createServer(createApplication(config));
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  context.after(() => new Promise<void>((resolve, reject) => {
+    server.close((error) => error ? reject(error) : resolve());
+  }));
+
+  const address = server.address();
+  assert.ok(address && typeof address !== 'string');
+  const consoleResponse = await fetch(`http://127.0.0.1:${address.port}/developer/overview`);
+  const developerLogin = await fetch(`http://127.0.0.1:${address.port}/developer/login`);
+  const homeResponse = await fetch(`http://127.0.0.1:${address.port}/`);
+  const apiResponse = await fetch(`http://127.0.0.1:${address.port}/api/v1/unknown`);
+
+  assert.equal(consoleResponse.status, 200);
+  assert.match(consoleResponse.headers.get('content-type') ?? '', /^text\/html/);
+  assert.match(await consoleResponse.text(), /<div id="root"><\/div>/);
+  assert.equal(developerLogin.status, 200);
+  assert.match(developerLogin.headers.get('content-type') ?? '', /^text\/html/);
+  assert.match(await homeResponse.text(), /<div id="root"><\/div>/);
+  assert.equal(apiResponse.status, 404);
+  assert.deepEqual((await apiResponse.json() as { error: string }).error, 'not_found');
+});
 test('readiness endpoint checks dependencies and fails closed on dependency errors', async (context) => {
   const unavailable = createServer(createApplication(config, undefined, undefined, undefined, undefined, undefined, async () => {
     throw new Error('dependency unavailable');
@@ -78,4 +104,19 @@ test('readiness endpoint checks dependencies and fails closed on dependency erro
   assert.equal(response.status, 503);
   assert.equal(body.status, 'unavailable');
   assert.equal(response.headers.get('x-request-id'), body.requestId);
+});
+
+test('developer auth API is mounted before the developer SPA fallback', async (context) => {
+  const developerAuth = express.Router();
+  developerAuth.get('/session', (_request, response) => response.json({ code: 0, data: { account: null } }));
+  const app = createApplication(config, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, developerAuth);
+  const server = createServer(app);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  context.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  const address = server.address();
+  assert.ok(address && typeof address !== 'string');
+
+  const response = await fetch(`http://127.0.0.1:${address.port}/api/v1/developer-auth/session`);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json() as { code: number }).code, 0);
 });

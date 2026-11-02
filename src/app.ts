@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 
-import express, { type ErrorRequestHandler, type Express, type Router } from 'express';
+import express, { type ErrorRequestHandler, type Express, type Request, type Response, type Router } from 'express';
 import type Provider from 'oidc-provider';
 
 import type { ServiceConfig } from './config.js';
@@ -25,9 +25,17 @@ export function createApplication(
   readiness?: () => Promise<void>,
   recordProtocolEvent?: (event: ProtocolAuditEvent) => Promise<void>,
   userApi?: Router,
+  sessionApi?: Router,
+  accountApi?: Router,
+  adminApi?: Router,
+  developerAuth?: Router,
 ): Express {
   const app = express();
   const publicDirectory = resolve(process.cwd(), 'public');
+  const consoleDirectory = resolve(publicDirectory, 'app');
+  const sendConsole = (_request: Request, response: Response): void => {
+    response.sendFile(resolve(consoleDirectory, 'index.html'));
+  };
 
   app.disable('x-powered-by');
   app.set('trust proxy', config.trustedProxyCidrs);
@@ -47,17 +55,17 @@ export function createApplication(
   });
 
   app.use('/assets', express.static(publicDirectory, { index: false, fallthrough: false, maxAge: '1h' }));
-  app.get('/', (_request, response) => {
-    response.sendFile(resolve(publicDirectory, 'index.html'));
+  app.use('/app', express.static(consoleDirectory, { index: false, fallthrough: false, maxAge: '1h' }));
+  app.get('/', sendConsole);
+
+  app.get('/developer/login/moondrop', (request, response) => {
+    const requested = typeof request.query.returnTo === 'string' ? request.query.returnTo : '/developer/console/overview';
+    const returnTo = /^\/(?:developer|account)(?:\/|$)/.test(requested) ? requested : '/developer/console/overview';
+    response.redirect(303, '/portal/sign-in?return=' + encodeURIComponent('/developer/bind?returnTo=' + encodeURIComponent(returnTo)));
   });
 
-  app.get('/developer/login', (_request, response) => {
-    response.redirect(303, '/portal/sign-in?return=%2Fdeveloper');
-  });
-
-  app.get('/developer', (_request, response) => {
-    response.sendFile(resolve(publicDirectory, 'developer.html'));
-  });
+  app.get('/developer', (_request, response) => response.redirect(303, '/developer/overview'));
+  app.get('/account', (_request, response) => response.redirect(303, '/account/profile'));
 
   app.get('/health/ready', async (_request, response) => {
     try {
@@ -77,10 +85,16 @@ export function createApplication(
   });
 
   if (interactions) app.use('/interaction', interactions);
+  if (sessionApi) app.use('/api/v1/session', sessionApi);
   if (userApi) app.use('/api/v1/me', userApi);
+  if (accountApi) app.use('/api/v1/account', accountApi);
+  if (developerAuth) app.use('/api/v1/developer-auth', developerAuth);
   if (developer) app.use('/api/v1/developer', developer);
+  if (adminApi) app.use('/api/v1/admin', adminApi);
+  app.get(/^\/admin(?:$|\/(?!login(?:\/|$)).*)/, sendConsole);
   if (admin) app.use('/admin', admin);
   if (userPortal) app.use('/portal', userPortal);
+  app.get(/^\/(?:account|developer)(?:\/.*)?$/, sendConsole);
   if (provider) {
     if (recordProtocolEvent) {
       app.use((request, response, next) => {

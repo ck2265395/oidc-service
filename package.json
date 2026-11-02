@@ -3,19 +3,26 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "web"
+  ],
   "engines": {
     "node": ">=24 <25",
     "npm": ">=11"
   },
   "scripts": {
-    "dev": "tsx watch src/main.ts",
+    "dev": "node --env-file=.env.local node_modules/tsx/dist/cli.mjs watch src/main.ts",
     "start": "node dist/src/main.js",
-    "build": "tsc -p tsconfig.json",
-    "check": "tsc --noEmit -p tsconfig.json",
+    "build": "npm run build:server && npm run build:web",
+    "build:server": "tsc -p tsconfig.json",
+    "build:web": "npm run build --workspace web",
+    "check": "tsc --noEmit -p tsconfig.json && npm run check --workspace web",
     "lint": "eslint src test scripts eslint.config.js",
     "keys": "tsx scripts/keys.ts",
     "admin:password": "tsx scripts/admin-password.ts",
     "test": "tsx --test test/*.test.ts",
+    "test:web": "npm run test --workspace web",
+    "dev:web": "npm run dev --workspace web",
     "test:storage": "tsx --test test/storage/*.test.ts",
     "migrate": "node dist/scripts/migrate.js",
     "clean:expired": "node dist/scripts/clean-expired.js",

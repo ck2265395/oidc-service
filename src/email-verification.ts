@@ -88,7 +88,7 @@ export function createVerificationMailer(config: {
   user: string | null;
   password: string | null;
   from: string;
-}): { send: (to: string, link: string) => Promise<void>; close: () => void } {
+}): { send: (to: string, link: string) => Promise<void>; sendCode: (to: string, code: string) => Promise<void>; close: () => void } {
   const transport = nodemailer.createTransport({
     host: config.host,
     port: config.port,
@@ -102,11 +102,20 @@ export function createVerificationMailer(config: {
       await transport.sendMail({
         from: config.from,
         to,
-        subject: 'Verify your DT Identity contact email',
-        text: 'Open this link to verify your DT Identity contact email. This link expires in 30 minutes:\n' + link,
-        html: '<p>Open this link to verify your DT Identity contact email. This link expires in 30 minutes:</p><p><a href="' +
+        subject: 'Verify your MOONDROP contact email',
+        text: 'Open this link to verify your MOONDROP contact email. This link expires in 30 minutes:\n' + link,
+        html: '<p>Open this link to verify your MOONDROP contact email. This link expires in 30 minutes:</p><p><a href="' +
           link.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!) +
           '">Verify contact email</a></p>',
+      });
+    },
+    sendCode: async (to, code) => {
+      await transport.sendMail({
+        from: config.from,
+        to,
+        subject: 'MOONDROP developer verification code',
+        text: `Your MOONDROP developer verification code is ${code}. It expires in 10 minutes.`,
+        html: '<p>Your MOONDROP developer verification code is:</p><p style="font-size:24px;font-weight:700;letter-spacing:4px">' + code + '</p><p>It expires in 10 minutes.</p>',
       });
     },
     close: () => transport.close(),

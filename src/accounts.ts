@@ -96,13 +96,13 @@ export class PostgresAccountSource implements AccountSource {
 }
 
 function storedDigestIsValid(value: unknown): value is string {
-  return typeof value === 'string' && /^[a-fA-F0-9]{64}$/.test(value);
+  return typeof value === 'string' && /^[A-Za-z0-9+/]{43}=$/.test(value);
 }
 
-function safeDigestEqual(expectedHex: string, storedHex: string): boolean {
-  if (!storedDigestIsValid(storedHex)) return false;
-  const expected = Buffer.from(expectedHex, 'hex');
-  const stored = Buffer.from(storedHex, 'hex');
+function safeDigestEqual(expectedBase64: string, storedBase64: string): boolean {
+  if (!storedDigestIsValid(storedBase64)) return false;
+  const expected = Buffer.from(expectedBase64, 'base64');
+  const stored = Buffer.from(storedBase64, 'base64');
   return expected.length === stored.length && timingSafeEqual(expected, stored);
 }
 
@@ -164,7 +164,7 @@ export class AccountService {
 
     const candidate = createHmac('sha256', this.keys.legacyHmacKey)
       .update(password, 'utf8')
-      .digest('hex');
+      .digest('base64');
     if (!safeDigestEqual(candidate, account.password)) return null;
 
     return this.toIdentity(account, sector);

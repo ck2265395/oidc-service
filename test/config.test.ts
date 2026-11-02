@@ -73,6 +73,27 @@ test('requires an independently supplied legacy account key', () => {
   assert.throws(() => loadConfig(input), /secrets\.legacyHmacKey/);
 });
 
+test('accepts Redis credentials separately from the URL', () => {
+  const input = { ...validConfig(), redisUsername: 'default', redisPassword: 'redis-secret' };
+  const config = loadConfig(input);
+
+  assert.equal(config.redisUsername, 'default');
+  assert.equal(config.redisPassword, 'redis-secret');
+});
+
+test('rejects Redis credentials embedded in the URL', () => {
+  const input = { ...validConfig(), redisUrl: 'redis://default:redis-secret@localhost:6379/0' };
+
+  assert.throws(() => loadConfig(input), /without embedded credentials/);
+});
+
+test('accepts the existing account system legacy key length', () => {
+  const input = validConfig();
+  input.secrets.legacyHmacKey = 'legacy-key&&';
+
+  assert.equal(loadConfig(input).secrets.legacyHmacKey, 'legacy-key&&');
+});
+
 test('requires HTTPS issuer in production', () => {
   const input = validConfig();
   input.mode = 'production';

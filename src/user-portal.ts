@@ -30,7 +30,10 @@ function loginStateKey(state: string, secret: string): string {
 }
 
 function safeReturnPath(value: unknown): string {
-  return value === '/portal/authorizations' || value === '/portal/profile' ? value : '/developer';
+  if (typeof value !== 'string') return '/developer/overview';
+  if (value === '/portal/authorizations' || value === '/portal/profile') return value;
+  if (/^\/(?:developer|account)(?:\/[A-Za-z0-9._~-]+)*$/.test(value)) return value;
+  return '/developer/overview';
 }
 
 function portalJwks(provider: Provider, issuer: string): ReturnType<typeof createRemoteJWKSet> {
@@ -61,7 +64,7 @@ function cookieValue(request: Request, name: string): string | null {
 function html(title: string, content: string): string {
   return '<!doctype html><html lang="zh-CN"><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<title>' + escapeHtml(title) + ' · DT Identity</title>' +
+    '<title>' + escapeHtml(title) + ' · MOONDROP</title><link rel="icon" href="/assets/moondrop.ico">' +
     '<style>body{font:16px system-ui,sans-serif;max-width:48rem;margin:7vh auto;padding:0 1rem;color:#172033}' +
     'main{border:1px solid #dce3ec;border-radius:12px;padding:1.5rem}button{padding:.55rem 1rem;cursor:pointer}' +
     'li{padding:.6rem 0;border-bottom:1px solid #e6ebf1}</style><main><h1>' +
@@ -141,7 +144,7 @@ export function createUserPortalRouter(
       );
       if (stored !== 'OK') throw new Error('Portal login state could not be stored');
       const challenge = createHash('sha256').update(loginState.verifier, 'utf8').digest('base64url');
-      const authorization = new URL(config.issuer + '/authorize');
+      const authorization = new URL(config.issuer + '/auth');
       authorization.searchParams.set('client_id', PORTAL_CLIENT_ID);
       authorization.searchParams.set('redirect_uri', config.issuer + '/portal/callback');
       authorization.searchParams.set('response_type', 'code');
@@ -177,18 +180,26 @@ export function createUserPortalRouter(
         typeof (parsed as PortalState).returnTo !== 'string'
       ) return error(response, 400, '登录事务无效，请重新开始 / Invalid sign-in transaction. Start again.');
       const loginState = parsed as PortalState;
-      const tokenResponse = await fetch(config.issuer + '/token', {
-        method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          code,
-          redirect_uri: config.issuer + '/portal/callback',
-          client_id: PORTAL_CLIENT_ID,
-          code_verifier: loginState.verifier,
-        }),
-        signal: AbortSignal.timeout(5000),
-      });
+      const tokenRequest = new AbortController();
+      const tokenRequestTimeout = setTimeout(() => tokenRequest.abort(), 5000);
+      const tokenResponse = await (async () => {
+        try {
+          return await fetch(config.issuer + '/token', {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              grant_type: 'authorization_code',
+              code,
+              redirect_uri: config.issuer + '/portal/callback',
+              client_id: PORTAL_CLIENT_ID,
+              code_verifier: loginState.verifier,
+            }),
+            signal: tokenRequest.signal,
+          });
+        } finally {
+          clearTimeout(tokenRequestTimeout);
+        }
+      })();
       if (!tokenResponse.ok) return error(response, 400, '登录验证失败，请重新开始 / Sign-in verification failed. Start again.');
       const tokens = await tokenResponse.json() as Record<string, unknown>;
       if (typeof tokens.id_token !== 'string') return error(response, 400, '登录验证失败，请重新开始 / Sign-in verification failed. Start again.');
@@ -245,7 +256,6 @@ export function createUserPortalRouter(
         "SELECT d.document_id, d.client_id, coalesce(d.payload->>'scope', d.payload->'openid'->>'scope') AS scope, d.created_at, coalesce(a.approved_config->>'name', a.draft_config->>'name') AS name, a.status FROM oidc_document d LEFT JOIN oidc_application a ON a.client_id = d.client_id AND a.status = 'approved' WHERE d.model = 'Grant' AND d.payload->>'accountId' = $1 AND (d.expires_at IS NULL OR d.expires_at > now()) ORDER BY d.created_at DESC, d.document_id LIMIT 100",
         [session.accountId],
       );
-      const csrf = csrfToken(response);
       const navigation = '<nav><a href="/portal/profile">个人资料 / Profile</a> · <a href="/portal/authorizations">应用授权 / Authorizations</a></nav>';
       const list = result.rows.map((row) => {
         const name = row.name ?? row.client_id ?? '未知应用';

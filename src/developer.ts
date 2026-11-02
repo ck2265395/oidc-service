@@ -8,6 +8,10 @@ import { ApplicationValidationError, type ClientType } from './applications.js';
 import { ApplicationConflictError, type ApplicationRecord, type ApplicationStatus, ApplicationService } from './platform.js';
 import { ApplicationGroupError, type ApplicationGroupService } from './groups.js';
 import { DeveloperEmailVerification, EmailVerificationError } from './email-verification.js';
+import type { DeveloperStatus } from './developer-identity.js';
+import type { DeveloperSessionService } from './developer-session.js';
+import { DeveloperReviewError, type PostgresDeveloperStore } from './developer-store.js';
+import type { DeveloperAuthService } from './developer-auth-service.js';
 
 interface Body {
   [key: string]: unknown;
@@ -84,12 +88,15 @@ export function createDeveloperRouter(
   issuer: string,
   secureCookies: boolean,
   emailVerification: DeveloperEmailVerification | null = null,
+  developerSessions: Pick<DeveloperSessionService, 'resolve' | 'create'> | null = null,
+  developerStore: Pick<PostgresDeveloperStore, 'findByExternalIdentity' | 'createExternalAccount' | 'bindExternalIdentity' | 'getProfile' | 'saveProfile' | 'submitReview' | 'listReviewHistory'> | null = null,
+  developerAuth: Pick<DeveloperAuthService, 'loginWithPassword'> | null = null,
 ): Router {
   const router = Router();
   router.use(express.json({ limit: '32kb' }));
   router.use(express.urlencoded({ extended: false, limit: '4kb', parameterLimit: 4 }));
 
-  const authenticatedOwner = async (request: Request, response: Response): Promise<string | null> => {
+  const authenticatedMoondropSubject = async (request: Request, response: Response): Promise<string | null> => {
     try {
       const context = provider.createContext(request, response);
       const session = await provider.Session.get(context);
@@ -106,6 +113,18 @@ export function createDeveloperRouter(
       return null;
     }
   };
+  const authenticatedDeveloper = async (request: Request, response: Response): Promise<{ id: string; status: DeveloperStatus } | null> => {
+    const developerToken = readCookie(request, 'md-developer');
+    if (developerToken && developerSessions) {
+      const developer = await developerSessions.resolve(developerToken);
+      if (developer) return { id: developer.id, status: developer.status };
+    }
+    const subject = await authenticatedMoondropSubject(request, response);
+    if (!subject) return null;
+    const mapped = developerStore ? await developerStore.findByExternalIdentity('moondrop', subject) : null;
+    return mapped ? { id: mapped.id, status: mapped.status } : { id: subject, status: 'unsubmitted' };
+  };
+  const authenticatedOwner = async (request: Request, response: Response): Promise<string | null> => (await authenticatedDeveloper(request, response))?.id ?? null;
 
   const ensureWriteRequest = (request: Request, response: Response): boolean => {
     const origin = request.header('origin');
@@ -138,7 +157,7 @@ export function createDeveloperRouter(
     const ownerUuid = await authenticatedOwner(request, response);
     if (!ownerUuid) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
     try {
-      const profile = await applications.getDeveloperProfile(ownerUuid);
+      const profile = developerStore ? await developerStore.getProfile(ownerUuid) : await applications.getDeveloperProfile(ownerUuid);
       response.json({ code: 0, desc: 'ok', data: profile });
     } catch {
       jsonError(response, 503, 'storage_unavailable', 'Developer profile is unavailable');
@@ -154,15 +173,99 @@ export function createDeveloperRouter(
       return jsonError(response, 400, 'invalid_revision', 'A profile revision is required');
     }
     try {
-      const profile = await applications.saveDeveloperProfile(ownerUuid, {
-        displayName: input.displayName,
-        contactEmail: input.contactEmail,
-      }, Number(input.expectedRevision));
+      const profile = developerStore
+        ? await developerStore.saveProfile(ownerUuid, {
+          displayName: scalar(input.displayName) ?? '',
+          contactEmail: scalar(input.contactEmail) ?? '',
+          contactPhone: scalar(input.contactPhone),
+          purpose: scalar(input.purpose) ?? '',
+          expectedRevision: Number(input.expectedRevision),
+        })
+        : await applications.saveDeveloperProfile(ownerUuid, {
+          displayName: input.displayName,
+          contactEmail: input.contactEmail,
+        }, Number(input.expectedRevision));
       response.json({ code: 0, desc: 'ok', data: profile });
     } catch (error) {
       if (error instanceof ApplicationConflictError) return jsonError(response, 409, 'profile_conflict', error.message);
+      if (error instanceof DeveloperReviewError) {
+        const status = error.code === 'review_conflict' ? 409 : error.code === 'profile_locked' ? 423 : 400;
+        return jsonError(response, status, error.code, error.code === 'profile_locked' ? 'Profile is locked during review' : 'Developer profile is invalid');
+      }
       jsonError(response, 503, 'storage_unavailable', 'Developer profile is unavailable');
     }
+  });
+
+  const establishDeveloperSession = async (response: Response, developerId: string): Promise<void> => {
+    if (!developerSessions) throw new Error('Developer sessions are unavailable');
+    const token = await developerSessions.create(developerId);
+    response.cookie('md-developer', token, {
+      httpOnly: true, sameSite: 'lax', secure: secureCookies, path: '/', maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+  };
+
+  router.get('/moondrop/status', async (request, response) => {
+    const subject = await authenticatedMoondropSubject(request, response);
+    if (!subject) return jsonError(response, 401, 'authentication_required', 'MOONDROP sign in is required');
+    const account = developerStore ? await developerStore.findByExternalIdentity('moondrop', subject) : null;
+    response.json({ code: 0, desc: 'ok', data: { bound: Boolean(account), account } });
+  });
+
+  router.post('/moondrop/create', async (request, response) => {
+    if (!ensureWriteRequest(request, response)) return;
+    if (!developerStore || !developerSessions) return jsonError(response, 503, 'storage_unavailable', 'Developer identity is unavailable');
+    const subject = await authenticatedMoondropSubject(request, response);
+    if (!subject) return jsonError(response, 401, 'authentication_required', 'MOONDROP sign in is required');
+    try {
+      const existing = await developerStore.findByExternalIdentity('moondrop', subject);
+      const account = existing ?? await developerStore.createExternalAccount('moondrop', subject);
+      await establishDeveloperSession(response, account.id);
+      response.status(existing ? 200 : 201).json({ code: 0, desc: 'ok', data: account });
+    } catch {
+      jsonError(response, 409, 'identity_conflict', 'MOONDROP account is already bound');
+    }
+  });
+
+  router.post('/moondrop/bind', async (request, response) => {
+    if (!ensureWriteRequest(request, response)) return;
+    if (!developerStore || !developerSessions || !developerAuth) return jsonError(response, 503, 'storage_unavailable', 'Developer identity is unavailable');
+    const subject = await authenticatedMoondropSubject(request, response);
+    if (!subject) return jsonError(response, 401, 'authentication_required', 'MOONDROP sign in is required');
+    try {
+      const credential = await developerAuth.loginWithPassword(String(body(request).email ?? ''), String(body(request).password ?? ''));
+      await developerStore.bindExternalIdentity(credential.developerId, 'moondrop', subject);
+      await establishDeveloperSession(response, credential.developerId);
+      response.json({ code: 0, desc: 'ok', data: { developerId: credential.developerId } });
+    } catch {
+      jsonError(response, 401, 'binding_failed', 'Developer credentials are invalid or the account is already bound');
+    }
+  });
+
+  router.post('/review/submit', async (request, response) => {
+    if (!ensureWriteRequest(request, response)) return;
+    const developer = await authenticatedDeveloper(request, response);
+    if (!developer) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
+    if (!developerStore) return jsonError(response, 503, 'storage_unavailable', 'Developer review is unavailable');
+    const expectedRevision = body(request).expectedRevision;
+    if (!Number.isSafeInteger(expectedRevision) || Number(expectedRevision) < 1) return jsonError(response, 400, 'invalid_revision', 'A developer revision is required');
+    try {
+      const account = await developerStore.submitReview(developer.id, Number(expectedRevision));
+      response.json({ code: 0, desc: 'ok', data: account });
+    } catch (error) {
+      if (error instanceof DeveloperReviewError) {
+        const status = error.code === 'review_conflict' ? 409 : error.code === 'not_found' ? 404 : 400;
+        return jsonError(response, status, error.code, error.code === 'profile_incomplete' ? 'Complete and verify the developer profile before submitting' : 'Developer review submission is not allowed');
+      }
+      jsonError(response, 503, 'storage_unavailable', 'Developer review is unavailable');
+    }
+  });
+
+  router.get('/review/history', async (request, response) => {
+    const developer = await authenticatedDeveloper(request, response);
+    if (!developer) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
+    if (!developerStore) return jsonError(response, 503, 'storage_unavailable', 'Developer review is unavailable');
+    try { response.json({ code: 0, desc: 'ok', data: await developerStore.listReviewHistory(developer.id) }); }
+    catch { jsonError(response, 503, 'storage_unavailable', 'Developer review history is unavailable'); }
   });
 
   router.post('/profile/verification-email', async (request, response) => {
@@ -185,11 +288,11 @@ export function createDeveloperRouter(
   router.get('/verify-email', (request, response) => {
     const token = scalar(request.query.token);
     if (!emailVerification || !token || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
-      return response.status(400).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Email verification · DT Identity</title><h1>Verification link is invalid or expired</h1></html>');
+      return response.status(400).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Email verification · MOONDROP</title><h1>Verification link is invalid or expired</h1></html>');
     }
     response.type('html').send(
       '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-      '<title>Confirm email · DT Identity</title><main><h1>Confirm your contact email</h1>' +
+      '<title>Confirm email · MOONDROP</title><main><h1>Confirm your contact email</h1>' +
       '<p>Continue to verify the contact email on your developer profile.</p>' +
       '<form method="post" action="/api/v1/developer/verify-email"><input type="hidden" name="token" value="' + token +
       '"><button type="submit">Verify email</button></form></main></html>',
@@ -198,11 +301,11 @@ export function createDeveloperRouter(
 
   router.post('/verify-email', async (request, response) => {
     if (request.header('origin') !== new URL(issuer).origin) {
-      return response.status(403).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Denied · DT Identity</title><h1>Request origin is not allowed</h1></html>');
+      return response.status(403).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Denied · MOONDROP</title><h1>Request origin is not allowed</h1></html>');
     }
     const token = scalar(body(request).token);
     if (!emailVerification || !token) {
-      return response.status(400).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Email verification · DT Identity</title><h1>Verification link is invalid or expired</h1></html>');
+      return response.status(400).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Email verification · MOONDROP</title><h1>Verification link is invalid or expired</h1></html>');
     }
     try {
       const verified = await emailVerification.consume(token);
@@ -210,11 +313,11 @@ export function createDeveloperRouter(
       const heading = verified ? 'Your contact email is verified.' : 'Verification link is invalid or expired.';
       response.status(verified ? 200 : 400).type('html').send(
         '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-        '<title>' + title + ' · DT Identity</title><main><h1>' + heading +
+        '<title>' + title + ' · MOONDROP</title><main><h1>' + heading +
         '</h1><p>You may close this page and return to the developer center.</p><a href="/developer">Developer center</a></main></html>',
       );
     } catch {
-      response.status(503).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Unavailable · DT Identity</title><h1>Verification is temporarily unavailable</h1></html>');
+      response.status(503).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Unavailable · MOONDROP</title><h1>Verification is temporarily unavailable</h1></html>');
     }
   });
 
@@ -236,12 +339,13 @@ export function createDeveloperRouter(
 
   router.post('/groups', async (request, response) => {
     if (!ensureWriteRequest(request, response)) return;
-    const ownerUuid = await authenticatedOwner(request, response);
-    if (!ownerUuid) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
+    const developer = await authenticatedDeveloper(request, response);
+    if (!developer) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
+    const ownerUuid = developer.id;
     const profile = await applications.getDeveloperProfile(ownerUuid);
     if (!profile) return jsonError(response, 409, 'profile_required', 'Register a developer profile first');
     try {
-      const group = await groups.create(ownerUuid, body(request).displayName);
+      const group = await groups.create(ownerUuid, body(request).displayName, developer.status);
       response.status(201).json({ code: 0, desc: 'ok', data: group });
     } catch (error) {
       if (error instanceof ApplicationGroupError) return jsonError(response, 400, 'invalid_group', error.message);
@@ -318,8 +422,9 @@ export function createDeveloperRouter(
 
   router.post('/applications', async (request, response) => {
     if (!ensureWriteRequest(request, response)) return;
-    const ownerUuid = await authenticatedOwner(request, response);
-    if (!ownerUuid) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
+    const developer = await authenticatedDeveloper(request, response);
+    if (!developer) return jsonError(response, 401, 'authentication_required', 'Sign in is required');
+    const ownerUuid = developer.id;
     const profile = await applications.getDeveloperProfile(ownerUuid);
     if (!profile) return jsonError(response, 409, 'profile_required', 'Register a developer profile first');
     const input = body(request);
@@ -328,7 +433,7 @@ export function createDeveloperRouter(
       return jsonError(response, 400, 'invalid_client_type', 'Client type is invalid');
     }
     try {
-      const created = await applications.createWithSecret(ownerUuid, type as ClientType, input.draft);
+      const created = await applications.createWithSecret(ownerUuid, type as ClientType, input.draft, developer.status);
       response.status(201).json({
         code: 0,
         desc: 'ok',

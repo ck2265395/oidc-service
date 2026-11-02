@@ -31,7 +31,7 @@ export function createProvider(
     adapter,
     clients: [{
       client_id: PORTAL_CLIENT_ID,
-      client_name: 'DT Identity Portal',
+      client_name: 'MOONDROP',
       client_uri: issuer,
       redirect_uris: [issuer + '/portal/callback'],
       response_types: ['code'],

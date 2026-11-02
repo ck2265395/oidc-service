@@ -67,14 +67,15 @@ function setCsrf(response: Response, uid: string, key: string, secure: boolean):
 }
 
 function page(title: string, content: string): string {
-  return '<!doctype html><html lang="zh-CN"><meta charset="utf-8">' +
+  return '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<title>' + escapeHtml(title) + ' · DT Identity</title>' +
-    '<style>body{font:16px system-ui,sans-serif;max-width:34rem;margin:8vh auto;padding:0 1rem;color:#172033}' +
-    'main{border:1px solid #dbe2ea;border-radius:12px;padding:1.5rem}label{display:block;margin:1rem 0 .35rem}' +
-    'input,select,button{font:inherit;padding:.65rem;width:100%;box-sizing:border-box}button{margin-top:1rem;cursor:pointer}' +
-    '.muted{color:#526174;font-size:.92rem}</style><main><h1>' + escapeHtml(title) + '</h1>' +
-    content + '</main></html>';
+    '<title>' + escapeHtml(title) + ' · MOONDROP</title>' +
+    '<link rel="icon" href="/assets/moondrop.ico"><link rel="stylesheet" href="/assets/identity.css"></head><body><div class="identity-shell">' +
+    '<header><a class="identity-brand" href="/"><img src="/assets/moondrop.ico" alt="MOONDROP" width="36" height="36" style="object-fit:contain;border-radius:8px"><strong>MOONDROP<small>统一身份平台</small></strong></a>' +
+    '<div class="security-label"><i></i>安全连接 / Secure connection</div></header>' +
+    '<main class="identity-card"><div class="identity-heading"><span>IDENTITY ACCESS</span><h1>' + escapeHtml(title) + '</h1></div>' +
+    content + '<footer>由 MOONDROP 提供安全认证 · Secured by OpenID Connect</footer></main>' +
+    '<p class="identity-copyright">© 2026 MOONDROP</p></div></body></html>';
 }
 
 function errorPage(response: Response, status = 400): void {
@@ -118,7 +119,7 @@ export function createInteractionRouter(
       const active = isPortalClient ? null : await applications.activeClient(clientId);
       if (!isPortalClient && !active) return errorPage(response);
 
-      const clientName = active?.config.name ?? 'DT Identity';
+      const clientName = active?.config.name ?? 'MOONDROP';
       const csrf = setCsrf(response, details.uid, csrfKey, secureCookies);
       if (details.prompt.name === 'login') {
         const form = '<p class="muted">继续使用 / Continue signing in with ' + escapeHtml(clientName) + '</p>' +
@@ -141,7 +142,7 @@ export function createInteractionRouter(
         if (!scopes) return errorPage(response);
         const developer = active
           ? await applications.getDeveloperProfile(active.record.ownerUuid)
-          : { displayName: 'DT Identity' };
+          : { displayName: 'MOONDROP' };
         if (!developer) return errorPage(response);
         const scopeNames: Record<string, string> = {
           openid: '识别你的身份 / Identify you',

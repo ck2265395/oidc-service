@@ -13,13 +13,22 @@ import { createProvider } from './provider.js';
 import { createInteractionRouter } from './interactions.js';
 import { createDeveloperRouter } from './developer.js';
 import { createAdminRouter } from './admin.js';
+import { createAccountApiRouter } from './account-api.js';
+import { createAdminApiRouter } from './admin-api.js';
 import { createUserPortalRouter } from './user-portal.js';
 import { createUserApiRouter } from './user-api.js';
+import { createSessionApiRouter } from './session-api.js';
 import { ApplicationService } from './platform.js';
 import { ApplicationGroupService } from './groups.js';
 import { createPlatformPool, PostgresApplicationRepository } from './store.js';
 import { RedisLoginRateLimiter } from './login-limiter.js';
 import { DeveloperEmailVerification, createVerificationMailer } from './email-verification.js';
+import { PostgresDeveloperStore } from './developer-store.js';
+import { DeveloperEmailCode } from './developer-email-code.js';
+import { DeveloperAuthService } from './developer-auth-service.js';
+import { DeveloperSessionService } from './developer-session.js';
+import { createDeveloperAuthRouter } from './developer-auth.js';
+import { hashDeveloperPassword } from './developer-identity.js';
 
 function record(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -62,7 +71,11 @@ export async function start(): Promise<void> {
   const mailer = config.smtp ? createVerificationMailer(config.smtp) : null;
   const oidcPool = createPlatformPool(config.databases.oidc);
   const accountPool = createAccountPool(config.databases.accounts);
-  const redisClient = createClient({ url: config.redisUrl });
+  const redisClient = createClient({
+    url: config.redisUrl,
+    ...(config.redisUsername ? { username: config.redisUsername } : {}),
+    ...(config.redisPassword ? { password: config.redisPassword } : {}),
+  });
   const redisSubscriber = redisClient.duplicate();
   redisClient.on('error', () => {});
   redisSubscriber.on('error', () => {});
@@ -118,6 +131,21 @@ export async function start(): Promise<void> {
       loginRateLimiter,
       config.accountPortal,
     );
+    const developerStore = new PostgresDeveloperStore(oidcPool);
+    const developerSessions = new DeveloperSessionService(developerStore);
+    const developerCodes = new DeveloperEmailCode(
+      redisClient,
+      config.secrets.fingerprint,
+      async (email, code) => {
+        if (!mailer) throw new Error('Developer email delivery is not configured');
+        await mailer.sendCode(email, code);
+      },
+    );
+    const developerAuthService = new DeveloperAuthService(
+      developerStore,
+      developerCodes,
+      await hashDeveloperPassword('MOONDROP Dummy Developer 42!'),
+    );
     const emailVerification = mailer
       ? new DeveloperEmailVerification(redisClient, applications, config.issuer, mailer.send)
       : null;
@@ -129,6 +157,9 @@ export async function start(): Promise<void> {
       config.issuer,
       config.issuer.startsWith('https:'),
       emailVerification,
+      developerSessions,
+      developerStore,
+      developerAuthService,
     );
     const admin = createAdminRouter(oidcPool, config, applications, groups);
     const userPortal = createUserPortalRouter(oidcPool, provider, accounts, config, redisClient);
@@ -159,7 +190,17 @@ export async function start(): Promise<void> {
       );
     };
     const userApi = createUserApiRouter(provider, accounts, config.profilePictureBaseUrl);
-    const server = createServer(createApplication(config, provider, interactions, developer, admin, userPortal, readiness, recordProtocolEvent, userApi));
+    const sessionApi = createSessionApiRouter(provider, accounts, oidcPool, config);
+    const accountApi = createAccountApiRouter(oidcPool, provider, config);
+    const adminApi = createAdminApiRouter(oidcPool, config, applications, groups, developerStore);
+    const developerAuth = createDeveloperAuthRouter({
+      issuer: config.issuer,
+      secureCookies: config.issuer.startsWith('https:'),
+      auth: developerAuthService,
+      codes: developerCodes,
+      sessions: developerSessions,
+    });
+    const server = createServer(createApplication(config, provider, interactions, developer, admin, userPortal, readiness, recordProtocolEvent, userApi, sessionApi, accountApi, adminApi, developerAuth));
 
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
@@ -168,6 +209,7 @@ export async function start(): Promise<void> {
         resolve();
       });
     });
+    process.stdout.write(`OIDC service listening at ${config.issuer} (${config.mode})\n`);
 
     const shutdown = (): void => {
       server.close((error) => {

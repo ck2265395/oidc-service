@@ -9,7 +9,7 @@ const legacyHmacKey = 'independent-test-only-legacy-key';
 const fingerprintKey = randomBytes(32).toString('base64url');
 const subjectKey = randomBytes(32).toString('base64url');
 const passwordDigest = (password: string) =>
-  createHmac('sha256', legacyHmacKey).update(password, 'utf8').digest('hex');
+  createHmac('sha256', legacyHmacKey).update(password, 'utf8').digest('base64');
 
 function account(overrides: Partial<AccountRecord> = {}): AccountRecord {
   return {
