@@ -57,7 +57,13 @@ test('Nest developer API preserves registration conflict and session cookie cont
   const okTarget = await service(); context.after(okTarget.close);
   const registered = await fetch(okTarget.base + '/api/v1/developer-auth/register', { method: 'POST', headers, body: JSON.stringify({ email: 'dev@example.com', password: 'Developer Password 42!', code: '123456' }) });
   assert.equal(registered.status, 200);
-  assert.match(registered.headers.get('set-cookie') ?? '', /md-developer=.*HttpOnly.*SameSite=Lax/i);
+  const cookie = registered.headers.get('set-cookie') ?? '';
+  assert.match(cookie, /^md-developer=/);
+  assert.match(cookie, /HttpOnly/i);
+  assert.match(cookie, /Secure/i);
+  assert.match(cookie, /SameSite=Lax/i);
+  assert.match(cookie, /Path=\//i);
+  assert.match(cookie, /Max-Age=604800/i);
 });
 
 test('Nest developer API distinguishes registration dependency failures from duplicates', async (context) => {

@@ -1,6 +1,6 @@
 # NestJS backend architecture
 
-The default backend is a NestJS 12 modular monolith running on Node.js 24 with the Express platform adapter. `src/main.ts` starts `AppModule`; `src/legacy-main.ts` is a temporary one-release rollback entry and must not be used as the normal runtime.
+The backend is a NestJS 12 modular monolith running on Node.js 24 with the Express platform adapter. `src/main.ts` is the only server entry point and starts `AppModule`.
 
 ## Module ownership
 
@@ -26,4 +26,4 @@ Nest shutdown hooks close both PostgreSQL pools, both Redis clients, and the mai
 
 ## Rollback boundary
 
-For the migration release only, `npm run start:legacy` starts the prior Express composition. Production rollback should deploy the previous tested image/tag rather than mixing old and new processes. Remove the temporary legacy entry after the observation window and a reviewed follow-up release.
+Rollback means redeploying the previous tested image or tag with compatible database state. Do not run different application versions concurrently behind the same issuer unless that combination has been explicitly validated.

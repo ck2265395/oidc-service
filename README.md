@@ -1,12 +1,12 @@
 # DT Identity Service
 
-> Backend runtime: NestJS 12 modular monolith on Node.js 24, with `oidc-provider` mounted natively through the Express adapter. See [docs/nestjs-architecture.md](docs/nestjs-architecture.md). The temporary `npm run start:legacy` command is rollback-only for the migration release.
+> Backend runtime: NestJS 12 modular monolith on Node.js 24, with `oidc-provider` mounted natively through the Express adapter. See [docs/nestjs-architecture.md](docs/nestjs-architecture.md).
 
 独立开发的 OIDC 身份服务项目，项目署名使用 **DT／东土**。实现仍在开发中，不可用于生产环境。
 
 ## 技术基线
 
-- Node.js 24、TypeScript、Express
+- Node.js 24、TypeScript、NestJS 12（Express adapter）
 - OIDC 协议由上游 oidc-provider 处理
 - PostgreSQL 保存应用、协议状态、管理员会话和审核记录
 - 账号库通过只读连接查询；Redis 提供登录限流、协议重放检测、门户登录事务存储与跨实例客户端缓存通知

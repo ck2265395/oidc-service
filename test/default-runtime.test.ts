@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 async function text(path: string): Promise<string> { return readFile(new URL(`../${path}`, import.meta.url), 'utf8'); }
@@ -9,7 +9,8 @@ test('default runtime targets Nest and preserves protected configuration paths',
   assert.match(packageJson.scripts.dev ?? '', /src\/main\.ts/);
   assert.doesNotMatch(packageJson.scripts.dev ?? '', /src\/legacy-main\.ts/);
   assert.equal(packageJson.scripts.start, 'node dist/src/main.js');
-  assert.equal(packageJson.scripts['start:legacy'], 'node dist/src/legacy-main.js');
+  assert.equal(packageJson.scripts['start:legacy'], undefined);
+  await assert.rejects(access(new URL('../src/legacy-main.ts', import.meta.url)));
 
   const main = await text('src/main.ts');
   assert.match(main, /bootstrapNest/);

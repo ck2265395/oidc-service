@@ -5,10 +5,8 @@ import test from 'node:test';
 import express from 'express';
 import type { Pool } from 'pg';
 
-import { createAdminRouter } from '../src/admin.js';
+import { createAdminLoginRouter } from '../src/modules/admin/admin-login.router.js';
 import type { ServiceConfig } from '../src/config.js';
-import type { ApplicationGroupService } from '../src/groups.js';
-import type { ApplicationService } from '../src/platform.js';
 import { hashScryptPassword } from '../src/security.js';
 
 test('accepts an opaque Origin only for a browser-declared same-origin form', async (context) => {
@@ -34,12 +32,7 @@ test('accepts an opaque Origin only for a browser-declared same-origin form', as
     profilePictureBaseUrl: null,
   } satisfies ServiceConfig;
   const app = express();
-  app.use('/admin', createAdminRouter(
-    pool,
-    config,
-    {} as ApplicationService,
-    {} as ApplicationGroupService,
-  ));
+  app.use('/admin', createAdminLoginRouter(pool, config));
   const server = createServer(app);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   context.after(() => new Promise<void>((resolve, reject) => {
@@ -67,4 +60,22 @@ test('accepts an opaque Origin only for a browser-declared same-origin form', as
   });
 
   assert.equal(response.status, 401);
+
+  const success = await fetch(baseUrl + '/admin/login', {
+    method: 'POST', redirect: 'manual',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      cookie,
+      origin: 'null',
+      'sec-fetch-site': 'same-origin',
+    },
+    body: new URLSearchParams({ csrf, username: 'admin', password: 'correct-password' }),
+  });
+  const sessionCookie = success.headers.get('set-cookie') ?? '';
+  assert.equal(success.status, 303);
+  assert.equal(success.headers.get('location'), '/admin/applications');
+  assert.match(sessionCookie, /^dt-admin=/);
+  assert.match(sessionCookie, /HttpOnly/i);
+  assert.match(sessionCookie, /SameSite=Strict/i);
+  assert.match(sessionCookie, /Path=\//i);
 });
