@@ -2,6 +2,7 @@ import type { AddressInfo } from 'node:net';
 
 import { type INestApplication, Logger, type LoggerService } from '@nestjs/common';
 import type { Express } from 'express';
+import express from 'express';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 
@@ -34,6 +35,7 @@ export async function bootstrapNest(options: BootstrapOptions = {}): Promise<Nes
     ? options.logger
     : options.logger === false ? { log: () => undefined } : new Logger('HTTP');
   configureHttpFoundation(app.getHttpAdapter().getInstance() as Express, config.get(), requestLogger);
+  (app.getHttpAdapter().getInstance() as Express).use('/api', express.json({ limit: '32kb' }));
   app.useGlobalFilters(new ApplicationExceptionFilter());
   app.enableShutdownHooks();
   await app.listen(options.port ?? config.get().port, '127.0.0.1');

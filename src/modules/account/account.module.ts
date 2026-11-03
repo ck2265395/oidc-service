@@ -45,6 +45,7 @@ export class AccountModule {
     ];
     return {
       module: AccountModule, controllers: [AccountController, MeController, SessionController],
+      global: true,
       providers: [...providers, { provide: AccountApplicationService, inject: [RESOLVER, REPOSITORY, SESSIONS, SETTINGS], useFactory: (resolver: AccountResolutionPort, repository: AccountRepositoryPort, sessions: ProviderSessionPort, config: ServiceConfig) => new AccountApplicationService(resolver, repository, sessions, config) }],
       exports: [AccountApplicationService, ...(options ? [] : [ProviderSessionGateway])],
     };
