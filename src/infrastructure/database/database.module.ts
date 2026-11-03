@@ -1,4 +1,4 @@
-import { Inject, Injectable, Module, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
+import { Global, Inject, Injectable, Module, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
 import type { Pool } from 'pg';
 
 import { createAccountPool } from '../../accounts.js';
@@ -23,6 +23,7 @@ export class DatabaseLifecycle implements OnModuleInit, OnApplicationShutdown {
   }
 }
 
+@Global()
 @Module({
   providers: [
     { provide: OIDC_POOL, inject: [ConfigService], useFactory: (config: ConfigService): Pool => createPlatformPool(config.get().databases.oidc) },

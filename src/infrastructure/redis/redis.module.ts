@@ -1,4 +1,4 @@
-import { Inject, Injectable, Module, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
+import { Global, Inject, Injectable, Module, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
 import { createClient, type RedisClientType } from 'redis';
 
 import { REDIS_COMMAND, REDIS_SUBSCRIBER } from '../../common/tokens/injection-tokens.js';
@@ -35,6 +35,7 @@ function client(config: ConfigService): RedisClientType {
   return result;
 }
 
+@Global()
 @Module({
   providers: [
     { provide: REDIS_COMMAND, inject: [ConfigService], useFactory: client },

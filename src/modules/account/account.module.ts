@@ -26,7 +26,7 @@ export class ProviderSessionGateway implements ProviderSessionPort {
   revokeGrant(id: string, accountId: string): Promise<{ clientId: string | null } | null> { return this.delegate?.revokeGrant(id, accountId) ?? Promise.resolve(null); }
 }
 
-const RESOLVER = Symbol('ACCOUNT_RESOLVER');
+export const ACCOUNT_RESOLVER = Symbol('ACCOUNT_RESOLVER');
 const REPOSITORY = Symbol('ACCOUNT_REPOSITORY');
 const SESSIONS = Symbol('PROVIDER_SESSION_PORT');
 const SETTINGS = Symbol('ACCOUNT_SETTINGS');
@@ -35,19 +35,19 @@ const SETTINGS = Symbol('ACCOUNT_SETTINGS');
 export class AccountModule {
   static register(options?: AccountModuleOptions): DynamicModule {
     const providers = options ? [
-      { provide: SETTINGS, useValue: options.config }, { provide: RESOLVER, useValue: options.resolver },
+      { provide: SETTINGS, useValue: options.config }, { provide: ACCOUNT_RESOLVER, useValue: options.resolver },
       { provide: REPOSITORY, useValue: options.repository }, { provide: SESSIONS, useValue: options.sessions },
     ] : [
       { provide: SETTINGS, inject: [ConfigService], useFactory: (config: ConfigService) => config.get() },
-      { provide: RESOLVER, inject: [ACCOUNT_POOL, ConfigService], useFactory: (pool: Pool, config: ConfigService) => new AccountService(new PostgresAccountSource(pool), { legacyHmacKey: config.get().secrets.legacyHmacKey, fingerprintKey: config.get().secrets.fingerprint, subjectKey: config.get().secrets.subject }) },
+      { provide: ACCOUNT_RESOLVER, inject: [ACCOUNT_POOL, ConfigService], useFactory: (pool: Pool, config: ConfigService) => new AccountService(new PostgresAccountSource(pool), { legacyHmacKey: config.get().secrets.legacyHmacKey, fingerprintKey: config.get().secrets.fingerprint, subjectKey: config.get().secrets.subject }) },
       { provide: REPOSITORY, inject: [OIDC_POOL, ConfigService], useFactory: (pool: Pool, config: ConfigService) => new AccountRepository(pool, config.get()) },
       ProviderSessionGateway, { provide: SESSIONS, useExisting: ProviderSessionGateway },
     ];
     return {
       module: AccountModule, controllers: [AccountController, MeController, SessionController],
       global: true,
-      providers: [...providers, { provide: AccountApplicationService, inject: [RESOLVER, REPOSITORY, SESSIONS, SETTINGS], useFactory: (resolver: AccountResolutionPort, repository: AccountRepositoryPort, sessions: ProviderSessionPort, config: ServiceConfig) => new AccountApplicationService(resolver, repository, sessions, config) }],
-      exports: [AccountApplicationService, ...(options ? [] : [ProviderSessionGateway])],
+      providers: [...providers, { provide: AccountApplicationService, inject: [ACCOUNT_RESOLVER, REPOSITORY, SESSIONS, SETTINGS], useFactory: (resolver: AccountResolutionPort, repository: AccountRepositoryPort, sessions: ProviderSessionPort, config: ServiceConfig) => new AccountApplicationService(resolver, repository, sessions, config) }],
+      exports: [AccountApplicationService, ACCOUNT_RESOLVER, ...(options ? [] : [ProviderSessionGateway])],
     };
   }
 }

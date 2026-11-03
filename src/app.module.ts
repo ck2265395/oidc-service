@@ -12,10 +12,11 @@ import { AccountModule } from './modules/account/account.module.js';
 import { DeveloperModule } from './modules/developer/developer.module.js';
 import { ApplicationModule } from './modules/application/application.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
+import { OidcModule } from './modules/oidc/oidc.module.js';
 
 @Module({})
 export class AppModule {
   static register(config: ConfigService, infrastructure = false): DynamicModule {
-    return { module: AppModule, imports: [ConfigModule.register(config), ...(infrastructure ? [DatabaseModule, RedisModule, EmailModule, SigningKeyModule, AccountModule.register(), DeveloperModule.registerProduction(), ApplicationModule.registerProduction(), AdminModule.registerProduction()] : []), HealthModule, WebModule] };
+    return { module: AppModule, imports: [ConfigModule.register(config), ...(infrastructure ? [DatabaseModule, RedisModule, EmailModule, SigningKeyModule, AccountModule.register(), DeveloperModule.registerProduction(), ApplicationModule.registerProduction(), AdminModule.registerProduction(), OidcModule.registerProduction()] : []), HealthModule, WebModule] };
   }
 }

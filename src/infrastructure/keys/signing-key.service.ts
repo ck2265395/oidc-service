@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 
-import { Injectable, Module, type OnModuleInit } from '@nestjs/common';
+import { Global, Injectable, Module, type OnModuleInit } from '@nestjs/common';
 import type { JWKS } from 'oidc-provider';
 
 import { OIDC_SIGNING_KEYS } from '../../common/tokens/injection-tokens.js';
@@ -14,6 +14,7 @@ function record(value: unknown): Record<string, unknown> {
 export class SigningKeyService implements OnModuleInit {
   private value: JWKS | null = null;
   async onModuleInit(): Promise<void> {
+    if (this.value) return;
     const path = process.env.OIDC_SIGNING_KEY_FILE;
     if (!path) throw new Error('OIDC_SIGNING_KEY_FILE must point to protected key material');
     const root = record(JSON.parse(await readFile(path, 'utf8')) as unknown);
@@ -26,6 +27,7 @@ export class SigningKeyService implements OnModuleInit {
   get(): JWKS { if (!this.value) throw new Error('Signing keys are not initialized'); return this.value; }
 }
 
+@Global()
 @Module({
   providers: [
     SigningKeyService,

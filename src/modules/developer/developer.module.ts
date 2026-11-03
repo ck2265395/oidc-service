@@ -21,12 +21,13 @@ export interface DeveloperModuleOptions {
 @Module({})
 export class DeveloperModule {
   static register(options: DeveloperModuleOptions): DynamicModule {
-    return { module: DeveloperModule, controllers: [DeveloperController], providers: [{ provide: DeveloperService, useValue: new DeveloperService(options.config, options.sessions, options.store, options.moondrop, options.credentials) }], exports: [DeveloperService] };
+    return { module: DeveloperModule, global: true, controllers: [DeveloperController], providers: [{ provide: DeveloperService, useValue: new DeveloperService(options.config, options.sessions, options.store, options.moondrop, options.credentials) }], exports: [DeveloperService] };
   }
 
   static registerProduction(): DynamicModule {
     return {
       module: DeveloperModule,
+      global: true,
       imports: [DeveloperAuthModule.registerProduction()],
       controllers: [DeveloperController],
       providers: [{ provide: DeveloperService, inject: [ConfigService, DEVELOPER_SESSIONS, DEVELOPER_STORE, AccountApplicationService, NestDeveloperAuthService], useFactory: (config: ConfigService, sessions: DeveloperSessionService, store: PostgresDeveloperStore, accounts: AccountApplicationService, auth: NestDeveloperAuthService) => new DeveloperService(config.get(), sessions, store, { subject: async (request, response) => (await accounts.identity(request, response, 'developer-portal'))?.uuid ?? null }, { login: (email, password) => auth.login(email, password) }) }],

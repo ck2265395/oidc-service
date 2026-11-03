@@ -1,4 +1,4 @@
-import { Inject, Injectable, Module, type OnApplicationShutdown } from '@nestjs/common';
+import { Global, Inject, Injectable, Module, type OnApplicationShutdown } from '@nestjs/common';
 
 import { MAILER } from '../../common/tokens/injection-tokens.js';
 import { createVerificationMailer } from '../../email-verification.js';
@@ -17,6 +17,7 @@ export class EmailLifecycle implements OnApplicationShutdown {
   }
 }
 
+@Global()
 @Module({
   providers: [
     { provide: MAILER, inject: [ConfigService], useFactory: (config: ConfigService): VerificationMailer | null => config.get().smtp ? createVerificationMailer(config.get().smtp!) : null },

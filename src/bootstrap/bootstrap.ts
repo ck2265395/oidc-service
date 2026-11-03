@@ -10,6 +10,7 @@ import { AppModule } from '../app.module.js';
 import { ApplicationExceptionFilter } from '../common/filters/application-exception.filter.js';
 import { configureHttpFoundation } from '../common/middleware/request-context.middleware.js';
 import { ConfigService } from '../infrastructure/config/config.service.js';
+import { OidcProviderService } from '../modules/oidc/oidc-provider.service.js';
 
 export interface BootstrapOptions {
   configPath?: string;
@@ -36,6 +37,11 @@ export async function bootstrapNest(options: BootstrapOptions = {}): Promise<Nes
     : options.logger === false ? { log: () => undefined } : new Logger('HTTP');
   configureHttpFoundation(app.getHttpAdapter().getInstance() as Express, config.get(), requestLogger);
   (app.getHttpAdapter().getInstance() as Express).use('/api', express.json({ limit: '32kb' }));
+  if (options.infrastructure) {
+    const oidc = app.get(OidcProviderService);
+    await oidc.initialize();
+    oidc.mountProtocol(app.getHttpAdapter().getInstance() as Express);
+  }
   app.useGlobalFilters(new ApplicationExceptionFilter());
   app.enableShutdownHooks();
   await app.listen(options.port ?? config.get().port, '127.0.0.1');
