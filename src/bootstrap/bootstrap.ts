@@ -14,6 +14,7 @@ export interface BootstrapOptions {
   configPath?: string;
   port?: number;
   logger?: false | LoggerService | Array<'log' | 'error' | 'warn' | 'debug' | 'verbose' | 'fatal'>;
+  infrastructure?: boolean;
 }
 
 export interface NestApplicationHandle {
@@ -25,7 +26,7 @@ export interface NestApplicationHandle {
 export async function bootstrapNest(options: BootstrapOptions = {}): Promise<NestApplicationHandle> {
   const config = await ConfigService.fromFile(options.configPath);
   const app = await NestFactory.create(
-    AppModule.register(config),
+    AppModule.register(config, options.infrastructure),
     new ExpressAdapter(),
     { bodyParser: false, bufferLogs: true, logger: options.logger ?? ['log', 'error', 'warn'] },
   );
