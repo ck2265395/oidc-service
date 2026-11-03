@@ -94,14 +94,15 @@ function DeveloperProfilePage() {
   return <section className="panel form-panel"><div className="panel-heading"><div><span>PERSONAL PROFILE</span><h2>个人资料</h2><p>维护开发者名称、联系方式和接入用途。审核操作在“开发者审核”中单独管理。</p></div>{profile && <Status value={profile.contactEmailVerified ? 'verified' : 'unverified'} />}</div><form className="form-grid" onSubmit={save}><label><span>开发者名称</span><input name="displayName" required maxLength={100} defaultValue={profile?.displayName || ''} /></label><label><span>联系邮箱</span><input name="contactEmail" type="email" required defaultValue={profile?.contactEmail || ''} /></label><label><span>联系电话（选填）</span><input name="contactPhone" maxLength={50} defaultValue={profile?.contactPhone || ''} /></label><label className="full-field"><span>接入用途</span><textarea name="purpose" required maxLength={2000} defaultValue={profile?.purpose || ''} /></label><div className="form-actions"><button className="button primary" type="submit">保存资料</button>{profile && !profile.contactEmailVerified && <button className="button secondary" type="button" onClick={() => void verifyEmail()}>发送验证邮件</button>}<span role="status">{message}</span></div></form></section>;
 }
 
-function ReviewHistory() {
-  const resource = useResource(() => apiGet<Array<{ action: string; reason: string | null; created_at: string }>>('/api/v1/developer/review/history'));
+function ReviewHistory({ refreshKey = 0 }: { refreshKey?: number }) {
+  const resource = useResource(() => apiGet<Array<{ action: string; reason: string | null; created_at: string }>>('/api/v1/developer/review/history'), [refreshKey]);
   if (resource.loading || resource.error) return <Feedback loading={resource.loading} error={resource.error} />;
   return <div className="review-history"><h3>审核记录</h3>{resource.data?.length ? <ul>{resource.data.map((item, index) => <li key={`${item.created_at}-${index}`}><Status value={item.action === 'reject' ? 'rejected' : item.action === 'approve' ? 'approved' : 'pending'} /><span>{item.reason || '无附加说明'}</span><time>{new Date(item.created_at).toLocaleString('zh-CN')}</time></li>)}</ul> : <p>尚无审核记录。</p>}</div>;
 }
 
 function DeveloperReviewPage({ revision, status }: { revision?: number; status?: SessionData['developerStatus'] }) {
   const [message, setMessage] = useState('');
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const submitReview = async () => {
     setMessage('正在提交审核…');
     try {
@@ -109,10 +110,12 @@ function DeveloperReviewPage({ revision, status }: { revision?: number; status?:
       if (!currentRevision) throw new Error('开发者会话缺少有效版本，请刷新后重试');
       await developerMutation('/api/v1/developer/review/submit', 'POST', { expectedRevision: currentRevision });
       setMessage('资料已提交审核');
+      setHistoryRefreshKey((value) => value + 1);
+      window.dispatchEvent(new Event('developer-session-changed'));
     } catch (reason) { setMessage(reason instanceof Error ? reason.message : '提交审核失败'); }
   };
   const canSubmit = status === 'unsubmitted' || status === 'rejected';
-  return <section className="panel"><div className="panel-heading"><div><span>DEVELOPER REVIEW</span><h2>开发者审核</h2><p>完善个人资料后手动提交审核，审核通过后才可创建应用。</p></div>{status && <Status value={status} />}</div><div className="form-actions">{canSubmit && <button className="button primary" type="button" onClick={() => void submitReview()}>提交开发者审核</button>}<span role="status">{message}</span></div><ReviewHistory /></section>;
+  return <section className="panel"><div className="panel-heading"><div><span>DEVELOPER REVIEW</span><h2>开发者审核</h2><p>完善个人资料后手动提交审核，审核通过后才可创建应用。</p></div>{status && <Status value={status} />}</div><div className="form-actions">{canSubmit && <button className="button primary" type="button" onClick={() => void submitReview()}>提交开发者审核</button>}<span role="status">{message}</span></div><ReviewHistory refreshKey={historyRefreshKey} /></section>;
 }
 
 function DeveloperSecurityPage({ methods }: { methods?: Array<'email' | 'moondrop'> }) {
@@ -357,20 +360,22 @@ function ConsoleShell({ kind }: { kind: ConsoleKind }) {
   const active = copy.items.find(([path]) => location.pathname === path)?.[1] ?? copy.label;
   const session = useResource<SessionData>(async () => {
     if (kind !== 'developer') return apiGet<SessionData>('/api/v1/session');
-    try {
-      const developer = await apiGet<{ account: { id: string; status: SessionData['developerStatus']; revision: number; lastReview?: { reason: string | null; reviewedAt: string } | null } | null; authenticationMethods: Array<'email' | 'moondrop'>; csrfToken: string }>('/api/v1/developer-auth/session');
-      if (developer.account) return {
+    const developer = await apiGet<{ account: { id: string; status: SessionData['developerStatus']; revision: number; lastReview?: { reason: string | null; reviewedAt: string } | null } | null; authenticationMethods: Array<'email' | 'moondrop'>; csrfToken: string }>('/api/v1/developer-auth/session');
+    if (developer.account) return {
         account: { uuid: developer.account.id, nickname: '开发者', email: null, picture: null },
         admin: { authenticated: false }, csrfToken: developer.csrfToken,
         developerRevision: developer.account.revision,
         authenticationMethods: developer.authenticationMethods,
         ...(developer.account.status ? { developerStatus: developer.account.status } : {}),
         ...(developer.account.lastReview ? { developerReview: developer.account.lastReview } : {}),
-      };
-    } catch { /* compatibility fallback for existing MOONDROP sessions */ }
-    const legacy = await apiGet<SessionData>('/api/v1/session');
-    return legacy.account ? { ...legacy, developerStatus: 'approved' } : legacy;
+    };
+    return { account: null, admin: { authenticated: false }, csrfToken: developer.csrfToken, authenticationMethods: [] };
   }, [location.pathname, kind]);
+  useEffect(() => {
+    const refresh = () => session.reload();
+    window.addEventListener('developer-session-changed', refresh);
+    return () => window.removeEventListener('developer-session-changed', refresh);
+  }, [session.reload]);
   const signedIn = kind === 'admin' ? session.data?.admin.authenticated : Boolean(session.data?.account);
   const loginHref = kind === 'admin' ? '/admin/login' : `/developer/login?returnTo=${encodeURIComponent(location.pathname)}`;
   const logoutAdmin = async () => {

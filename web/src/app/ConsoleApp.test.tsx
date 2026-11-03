@@ -19,9 +19,9 @@ test('removed account routes return to the developer portal', () => {
 test('shows live developer overview data for the signed-in account', async () => {
   window.history.replaceState({}, '', '/developer/console/overview');
   const responses: Record<string, unknown> = {
-    '/api/v1/session': {
-      account: { uuid: 'account-1', nickname: 'Moon Dev', email: 'm***@example.com', picture: null },
-      admin: { authenticated: false }, csrfToken: 'console-token',
+    '/api/v1/developer-auth/session': {
+      account: { id: 'developer-1', status: 'approved', revision: 2 },
+      authenticationMethods: ['email'], csrfToken: 'console-token',
     },
     '/api/v1/developer/profile': {
       accountUuid: 'account-1', displayName: 'Moon Dev', contactEmail: 'moon@example.com',
