@@ -1,8 +1,7 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import type { Pool } from 'pg';
-import type { RedisClientType } from 'redis';
 
-import { OIDC_POOL, REDIS_COMMAND } from '../../common/tokens/injection-tokens.js';
+import { OIDC_POOL } from '../../common/tokens/injection-tokens.js';
 import type { ServiceConfig } from '../../config.js';
 import { ApplicationGroupService } from '../../groups.js';
 import { ConfigService } from '../../infrastructure/config/config.service.js';
@@ -20,7 +19,7 @@ export class ApplicationModule {
   static registerProduction(): DynamicModule {
     return { module: ApplicationModule, global: true, controllers: [ApplicationController], providers: [
       { provide: PostgresApplicationRepository, inject: [OIDC_POOL, ConfigService], useFactory: (pool: Pool, config: ConfigService) => new PostgresApplicationRepository(pool, config.get().mode === 'production' ? 'production' : 'development') },
-      { provide: ApplicationService, inject: [PostgresApplicationRepository, ConfigService, REDIS_COMMAND], useFactory: (repository: PostgresApplicationRepository, config: ConfigService, redis: RedisClientType) => { const service = new ApplicationService(repository, config.get().mode === 'production' ? 'production' : 'development', undefined, undefined, config.get().secrets.encryption); service.setClientCacheClearer((clientId) => { void redis.publish('dt:oidc:client-cache-clear', clientId).catch(() => undefined); }); return service; } },
+      { provide: ApplicationService, inject: [PostgresApplicationRepository, ConfigService], useFactory: (repository: PostgresApplicationRepository, config: ConfigService) => new ApplicationService(repository, config.get().mode === 'production' ? 'production' : 'development', undefined, undefined, config.get().secrets.encryption) },
       { provide: ApplicationGroupService, inject: [PostgresApplicationRepository], useFactory: (repository: PostgresApplicationRepository) => new ApplicationGroupService(repository) },
       { provide: ApplicationApiService, inject: [ConfigService, DeveloperService, ApplicationService, ApplicationGroupService], useFactory: (config: ConfigService, developer: DeveloperService, applications: ApplicationService, groups: ApplicationGroupService) => new ApplicationApiService(config.get(), developer, applications, groups) },
     ], exports: [ApplicationApiService, ApplicationService, ApplicationGroupService, PostgresApplicationRepository] };

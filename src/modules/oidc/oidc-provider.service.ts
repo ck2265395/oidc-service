@@ -19,6 +19,45 @@ import { mountProtocolMiddleware } from './oidc-protocol.middleware.js';
 import { isProtocolPath } from './oidc-protocol.middleware.js';
 import type { OidcAuditService } from './oidc-audit.service.js';
 
+const CACHE_INVALIDATION_CHANNEL = 'dt:oidc:client-cache-clear';
+
+export function clientIdFromRequest(queryClient: unknown, authorization: unknown): string | null {
+  if (typeof queryClient === 'string' && queryClient.length <= 255) return queryClient;
+  if (typeof authorization !== 'string' || !/^Basic\s/i.test(authorization)) return null;
+  try {
+    const decoded = Buffer.from(authorization.slice(6), 'base64').toString('utf8');
+    const separator = decoded.indexOf(':');
+    return separator > 0 && separator <= 255 ? decoded.slice(0, separator) : null;
+  } catch { return null; }
+}
+
+export function protocolAuditOutcome(status: number, location: unknown): 'success'|'denied'|'failure' {
+  if (status >= 500) return 'failure';
+  let redirectError = false;
+  if (typeof location === 'string') {
+    try { redirectError = new URL(location, 'http://local.invalid').searchParams.has('error'); } catch { redirectError = false; }
+  }
+  return status >= 400 || redirectError ? 'denied' : 'success';
+}
+
+export function protocolAuditEndpoint(path: string): string {
+  return path.replace(/^\//, '').replaceAll('/', '.');
+}
+
+export async function installClientCacheInvalidation(
+  provider: Pick<Provider, 'Client'>,
+  applications: Pick<ApplicationService, 'setClientCacheClearer'>,
+  redis: Pick<RedisClientType, 'publish'>,
+  subscriber: Pick<RedisClientType, 'subscribe'>,
+): Promise<void> {
+  const client = provider.Client as typeof provider.Client & { cacheClear(clientId?: string): void };
+  await subscriber.subscribe(CACHE_INVALIDATION_CHANNEL, (id) => { if (/^[A-Za-z0-9._~-]{1,255}$/.test(id)) client.cacheClear(id); });
+  applications.setClientCacheClearer((id) => {
+    client.cacheClear(id);
+    void redis.publish(CACHE_INVALIDATION_CHANNEL, id).catch(() => undefined);
+  });
+}
+
 @Injectable()
 export class OidcProviderService implements OnModuleInit {
   private providerValue: Provider | null = null;
@@ -53,9 +92,7 @@ export class OidcProviderService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.initialize();
-    const provider = this.provider;
-    const client = provider.Client as typeof provider.Client & { cacheClear(clientId?: string): void };
-    await this.subscriber.subscribe('dt:oidc:client-cache-clear', (id) => { if (/^[A-Za-z0-9._~-]{1,255}$/.test(id)) client.cacheClear(id); });
+    await installClientCacheInvalidation(this.provider, this.applications, this.redis, this.subscriber);
   }
 
   get provider(): Provider { if (!this.providerValue) throw new Error('OIDC provider is not initialized'); return this.providerValue; }
@@ -67,9 +104,9 @@ export class OidcProviderService implements OnModuleInit {
       if (!isProtocolPath(request.path)) { next(); return; }
       const started = performance.now(); const endpoint = request.path; const requestId = String(response.locals.requestId ?? '');
       response.once('finish', () => {
-        const status = response.statusCode; const outcome = status >= 500 ? 'failure' : status >= 400 ? 'denied' : 'success';
-        const candidate = typeof request.query.client_id === 'string' && request.query.client_id.length <= 255 ? request.query.client_id : null;
-        void this.audit.record({ requestId, endpoint, outcome, status, durationMs: Math.max(0, Math.round(performance.now() - started)), clientId: candidate }).catch(() => undefined);
+        const status = response.statusCode; const outcome = protocolAuditOutcome(status, response.getHeader('location'));
+        const candidate = clientIdFromRequest(request.query.client_id, request.header('authorization'));
+        void this.audit.record({ requestId, endpoint: protocolAuditEndpoint(endpoint), outcome, status, durationMs: Math.max(0, Math.round(performance.now() - started)), clientId: candidate }).catch(() => undefined);
       });
       next();
     });

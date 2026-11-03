@@ -15,6 +15,7 @@ import { OidcProviderService } from '../modules/oidc/oidc-provider.service.js';
 export interface BootstrapOptions {
   configPath?: string;
   port?: number;
+  host?: string;
   logger?: false | LoggerService | Array<'log' | 'error' | 'warn' | 'debug' | 'verbose' | 'fatal'>;
   infrastructure?: boolean;
 }
@@ -27,30 +28,35 @@ export interface NestApplicationHandle {
 
 export async function bootstrapNest(options: BootstrapOptions = {}): Promise<NestApplicationHandle> {
   const config = await ConfigService.fromFile(options.configPath);
-  const app = await NestFactory.create(
-    AppModule.register(config, options.infrastructure),
-    new ExpressAdapter(),
-    { bodyParser: false, bufferLogs: true, logger: options.logger ?? ['log', 'error', 'warn'] },
-  );
-  const requestLogger = options.logger && !Array.isArray(options.logger)
-    ? options.logger
-    : options.logger === false ? { log: () => undefined } : new Logger('HTTP');
-  configureHttpFoundation(app.getHttpAdapter().getInstance() as Express, config.get(), requestLogger);
-  (app.getHttpAdapter().getInstance() as Express).use('/api', express.json({ limit: '32kb' }));
-  (app.getHttpAdapter().getInstance() as Express).use('/api', express.urlencoded({ extended: false, limit: '16kb', parameterLimit: 20 }));
-  if (options.infrastructure) {
-    const oidc = app.get(OidcProviderService);
-    await oidc.initialize();
-    oidc.mountProtocol(app.getHttpAdapter().getInstance() as Express);
+  let app: INestApplication | undefined;
+  try {
+    app = await NestFactory.create(
+      AppModule.register(config, options.infrastructure),
+      new ExpressAdapter(),
+      { abortOnError: false, bodyParser: false, bufferLogs: true, logger: options.logger ?? ['log', 'error', 'warn'] },
+    );
+    const requestLogger = options.logger && !Array.isArray(options.logger)
+      ? options.logger
+      : options.logger === false ? { log: () => undefined } : new Logger('HTTP');
+    const server = app.getHttpAdapter().getInstance() as Express;
+    server.disable('x-powered-by');
+    configureHttpFoundation(server, config.get(), requestLogger);
+    server.use('/api', express.json({ limit: '32kb' }));
+    server.use('/api', express.urlencoded({ extended: false, limit: '16kb', parameterLimit: 20 }));
+    if (options.infrastructure) {
+      const oidc = app.get(OidcProviderService);
+      await oidc.initialize();
+      oidc.mountProtocol(server);
+    }
+    app.useGlobalFilters(new ApplicationExceptionFilter());
+    app.enableShutdownHooks();
+    await app.listen(options.port ?? config.get().port, options.host ?? '0.0.0.0');
+  } catch (cause) {
+    if (app) await app.close().catch(() => undefined);
+    throw cause;
   }
-  app.useGlobalFilters(new ApplicationExceptionFilter());
-  app.enableShutdownHooks();
-  await app.listen(options.port ?? config.get().port, '127.0.0.1');
   const address = app.getHttpServer().address() as AddressInfo | null;
-  if (!address) {
-    await app.close();
-    throw new Error('Nest application did not bind a TCP port');
-  }
+  if (!address) { await app.close(); throw new Error('Nest application did not bind a TCP port'); }
   let closed = false;
   return {
     app,

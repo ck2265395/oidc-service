@@ -29,9 +29,6 @@ export class WebController {
     response.sendFile(safeFile(consoleDirectory, Array.isArray(path) ? path.join('/') : path));
   }
 
-  @Get('admin/login')
-  adminLogin(): never { throw new NotFoundException(); }
-
   @Get('developer/login/moondrop')
   @Redirect()
   moondropLogin(@Query('returnTo') value?: string) { const target = value && /^\/(?:developer|account)(?:\/|$)/.test(value) ? value : '/developer/console/overview'; return { statusCode: 303, url: '/portal/sign-in?return=' + encodeURIComponent('/developer/bind?returnTo=' + encodeURIComponent(target)) }; }

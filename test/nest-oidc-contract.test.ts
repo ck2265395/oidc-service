@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
-import { createServer } from 'node:http';
 import test from 'node:test';
 
+import { Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { ExpressAdapter } from '@nestjs/platform-express';
 import express from 'express';
 import { exportJWK } from 'jose';
 import type { Adapter, AdapterPayload, JWKS } from 'oidc-provider';
@@ -21,20 +23,27 @@ class MemoryAdapter implements Adapter {
 }
 
 async function service() {
-  const app = express(); const server = createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve)); const address = server.address(); assert.ok(address && typeof address !== 'string');
+  @Module({}) class TestModule {}
+  const app = await NestFactory.create(TestModule, new ExpressAdapter(), { logger: false, bodyParser: false });
+  const server = app.getHttpAdapter().getInstance() as ReturnType<typeof express>;
+  server.use('/api', express.json({ limit: '32kb' }));
+  server.use('/api', express.urlencoded({ extended: false, limit: '16kb', parameterLimit: 20 }));
+  const listener = app.getHttpServer();
+  await new Promise<void>((resolve) => listener.listen(0, '127.0.0.1', resolve)); const address = listener.address(); assert.ok(address && typeof address !== 'string');
   const issuer = `http://127.0.0.1:${address.port}`; const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 }); const privateJwk = await exportJWK(privateKey);
   const keys = { keys: [{ ...privateJwk, kid: 'nest-contract-signing-key', alg: 'RS256', use: 'sig' }] } as JWKS;
   const provider = createProvider(issuer, (model) => new MemoryAdapter(model), { async resolve() { return null; } } as never, { async activeClient() { return undefined; } } as never, 'c'.repeat(43), keys);
-  mountProtocolMiddleware(app, provider);
-  app.get('/business-probe', (_request, response) => response.json({ owner: 'nest' }));
-  return { issuer, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
+  mountProtocolMiddleware(server, provider);
+  server.get('/business-probe', (_request, response) => response.json({ owner: 'nest' }));
+  await app.init();
+  return { issuer, close: () => app.close() };
 }
 
 test('Nest OIDC contract preserves native discovery, JWKS, redirects, and middleware scope', async (context) => {
   const target = await service(); context.after(target.close);
   const discovery = await fetch(target.issuer + '/.well-known/openid-configuration'); const metadata = await discovery.json() as Record<string, unknown>;
   assert.equal(discovery.status, 200); assert.equal(metadata.token_endpoint, target.issuer + '/token');
+  assert.deepEqual(metadata.subject_types_supported, ['public']);
   assert.equal((await fetch(target.issuer + '/jwks')).status, 200);
   const query = new URLSearchParams({ client_id: PORTAL_CLIENT_ID, redirect_uri: target.issuer + '/portal/callback', response_type: 'code', scope: 'openid profile email', code_challenge: 'a'.repeat(43), code_challenge_method: 'S256', state: 'nest-state' });
   const redirect = await fetch(target.issuer + '/auth?' + query, { redirect: 'manual' });

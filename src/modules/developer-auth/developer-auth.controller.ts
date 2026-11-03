@@ -6,6 +6,7 @@ import { NestDeveloperAuthService } from './developer-auth.service.js';
 
 function error(response: Response, status: number, code: string, desc: string): void { response.status(status).json({ code, desc, data: null }); }
 function value(body: unknown, key: string): string { return typeof body === 'object' && body !== null && typeof (body as Record<string, unknown>)[key] === 'string' ? String((body as Record<string, unknown>)[key]) : ''; }
+function postgresCode(cause: unknown): string | undefined { return cause && typeof cause === 'object' && typeof (cause as { code?: unknown }).code === 'string' ? (cause as { code: string }).code : undefined; }
 
 @Controller('api/v1/developer-auth')
 export class DeveloperAuthController {
@@ -31,7 +32,8 @@ export class DeveloperAuthController {
     catch (cause) {
       if (cause instanceof DeveloperAuthError) { error(response, 400, cause.code, cause.message); return; }
       if (cause instanceof TypeError) { error(response, 400, 'invalid_registration', cause.message); return; }
-      error(response, 409, 'registration_conflict', 'Developer account could not be registered');
+      if (postgresCode(cause) === '23505') { error(response, 409, 'registration_conflict', 'Developer account could not be registered'); return; }
+      error(response, 503, 'registration_unavailable', 'Developer account registration is unavailable');
     }
   }
 

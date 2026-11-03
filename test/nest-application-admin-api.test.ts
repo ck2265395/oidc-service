@@ -9,6 +9,7 @@ import express from 'express';
 import { ApplicationConflictError } from '../src/platform.js';
 import { ApplicationModule, type ApplicationModuleOptions } from '../src/modules/application/application.module.js';
 import { AdminModule, type AdminModuleOptions } from '../src/modules/admin/admin.module.js';
+import { ApplicationExceptionFilter } from '../src/common/filters/application-exception.filter.js';
 import { testServiceConfig } from './fixtures/service-config.js';
 
 async function service(applicationOverrides: Partial<ApplicationModuleOptions> = {}, adminOverrides: Partial<AdminModuleOptions> = {}) {
@@ -32,6 +33,7 @@ async function service(applicationOverrides: Partial<ApplicationModuleOptions> =
   };
   @Module({ imports: [ApplicationModule.register(application), AdminModule.register(admin)] }) class TestModule {}
   const app = await NestFactory.create(TestModule, new ExpressAdapter(), { logger: false, bodyParser: false });
+  app.useGlobalFilters(new ApplicationExceptionFilter());
   app.getHttpAdapter().getInstance().use('/api', express.json({ limit: '32kb' }));
   await app.listen(0, '127.0.0.1'); const address = app.getHttpServer().address(); assert.ok(address && typeof address !== 'string');
   return { base: `http://127.0.0.1:${address.port}`, close: () => app.close() };
@@ -49,7 +51,9 @@ test('Nest application and admin API gates creation and returns a client secret 
 
 test('Nest application and admin API rejects unauthenticated admin and maps optimistic review conflicts', async (context) => {
   const target = await service(); context.after(target.close);
-  assert.equal((await fetch(target.base + '/api/v1/admin/applications')).status, 401);
+  const anonymous = await fetch(target.base + '/api/v1/admin/applications');
+  assert.equal(anonymous.status, 401);
+  assert.deepEqual(await anonymous.json(), { code: 'authentication_required', desc: 'Administrator sign in is required', data: null });
   const response = await fetch(target.base + '/api/v1/admin/applications/app-1/review', { method: 'POST', headers: { ...writeHeaders, 'x-admin-test': 'yes' }, body: JSON.stringify({ action: 'approve', expectedRevision: 1 }) });
   assert.equal(response.status, 409); assert.equal((await response.json() as { code: string }).code, 'review_conflict');
 });

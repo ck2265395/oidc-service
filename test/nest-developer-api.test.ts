@@ -60,6 +60,13 @@ test('Nest developer API preserves registration conflict and session cookie cont
   assert.match(registered.headers.get('set-cookie') ?? '', /md-developer=.*HttpOnly.*SameSite=Lax/i);
 });
 
+test('Nest developer API distinguishes registration dependency failures from duplicates', async (context) => {
+  const target = await service({ auth: { async register() { throw new Error('database offline'); }, async loginWithPassword() { throw new Error('unused'); } } }); context.after(target.close);
+  const response = await fetch(target.base + '/api/v1/developer-auth/register', { method: 'POST', headers: { origin: 'https://identity.example.test', 'content-type': 'application/json' }, body: JSON.stringify({ email: 'dev@example.com', password: 'Developer Password 42!', code: '123456' }) });
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { code: 'registration_unavailable', desc: 'Developer account registration is unavailable', data: null });
+});
+
 test('Nest developer API binds a verified MOONDROP subject to the credential account without email merging', async (context) => {
   let bound: unknown[] = [];
   const target = await service({}, { store: {
