@@ -3,6 +3,8 @@
     "target": "es2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "lib": ["ES2022", "DOM"],
     "rootDir": ".",
     "outDir": "dist",
