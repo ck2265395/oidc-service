@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import { apiGet, consoleMutation, developerMutation } from '../api';
+import { DeveloperDocs } from './DeveloperDocs';
 import { DeveloperBinding, DeveloperLanding, DeveloperLogin, DeveloperRegister } from './DeveloperPublic';
 
 type ConsoleKind = 'account' | 'developer' | 'admin';
@@ -322,7 +323,6 @@ function ConsoleContent({ kind, active, csrfToken, developerStatus }: { kind: Co
   if (pathname === '/developer/applications') return <ApplicationsPage canCreate={developerStatus === 'approved'} />;
   if (pathname.startsWith('/developer/applications/')) return <ApplicationDetailPage id={pathname.slice('/developer/applications/'.length)} />;
   if (pathname === '/developer/groups') return <GroupsPage canCreate={developerStatus === 'approved'} />;
-  if (pathname === '/developer/docs') return <DocsPage />;
   if (location.pathname === '/admin/overview') return <AdminOverview />;
   if (location.pathname === '/admin/developers') return <AdminDevelopers csrfToken={csrfToken} />;
   if (location.pathname.startsWith('/admin/developers/')) return <AdminDeveloperDetail id={location.pathname.slice('/admin/developers/'.length)} csrfToken={csrfToken} />;
@@ -334,8 +334,6 @@ function ConsoleContent({ kind, active, csrfToken, developerStatus }: { kind: Co
   if (location.pathname === '/admin/statistics') return <AdminStatistics />;
   return <Placeholder title={active || consoleCopy[kind].label} />;
 }
-
-function DocsPage() { return <section className="panel docs-panel"><span>QUICK START</span><h2>OIDC 接入流程</h2><ol><li><strong>注册开发者资料</strong><p>补充联系人与可验证邮箱。</p></li><li><strong>创建应用组和应用</strong><p>选择 Web、SPA 或 Native 客户端类型，配置精确回调地址。</p></li><li><strong>提交平台审核</strong><p>审核通过后，使用 Discovery 文档完成标准 OIDC 接入。</p></li></ol><a className="button secondary" href="/.well-known/openid-configuration" target="_blank" rel="noreferrer">查看 Discovery 文档</a></section>; }
 
 function ConsoleShell({ kind }: { kind: ConsoleKind }) {
   const location = useLocation(); const copy = consoleCopy[kind];
@@ -367,5 +365,5 @@ function ConsoleShell({ kind }: { kind: ConsoleKind }) {
 }
 
 export function ConsoleApp() {
-  return <BrowserRouter><Routes><Route path="/" element={<DeveloperLanding />} /><Route path="/developer" element={<Navigate to="/" replace />} /><Route path="/developer/login" element={<DeveloperLogin />} /><Route path="/developer/register" element={<DeveloperRegister />} /><Route path="/developer/bind" element={<DeveloperBinding />} /><Route path="/developer/docs" element={<DocsPage />} /><Route path="/developer/console/*" element={<ConsoleShell kind="developer" />} /><Route path="/developer/overview" element={<Navigate to="/developer/console/overview" replace />} /><Route path="/developer/profile" element={<Navigate to="/developer/console/profile" replace />} /><Route path="/developer/applications" element={<Navigate to="/developer/console/applications" replace />} /><Route path="/developer/groups" element={<Navigate to="/developer/console/groups" replace />} /><Route path="/admin" element={<Navigate to="/admin/overview" replace />} /><Route path="/admin/*" element={<ConsoleShell kind="admin" />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></BrowserRouter>;
+  return <BrowserRouter><Routes><Route path="/" element={<DeveloperLanding />} /><Route path="/developer" element={<Navigate to="/" replace />} /><Route path="/developer/login" element={<DeveloperLogin />} /><Route path="/developer/register" element={<DeveloperRegister />} /><Route path="/developer/bind" element={<DeveloperBinding />} /><Route path="/developer/docs" element={<DeveloperDocs />} /><Route path="/developer/console/*" element={<ConsoleShell kind="developer" />} /><Route path="/developer/overview" element={<Navigate to="/developer/console/overview" replace />} /><Route path="/developer/profile" element={<Navigate to="/developer/console/profile" replace />} /><Route path="/developer/applications" element={<Navigate to="/developer/console/applications" replace />} /><Route path="/developer/groups" element={<Navigate to="/developer/console/groups" replace />} /><Route path="/admin" element={<Navigate to="/admin/overview" replace />} /><Route path="/admin/*" element={<ConsoleShell kind="admin" />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></BrowserRouter>;
 }

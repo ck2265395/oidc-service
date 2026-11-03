@@ -13,16 +13,16 @@ async function post(path: string, body: unknown): Promise<void> {
   if (!response.ok) throw new Error(payload?.desc || '请求失败，请稍后重试');
 }
 
-function Header() {
+export function DeveloperPublicHeader() {
   return <header className="developer-public-header"><Link className="developer-public-brand" to="/"><img src="/assets/moondrop.ico" alt="MOONDROP" /><span><strong>MOONDROP</strong><small>开放平台</small></span></Link><nav><a href="/developer/docs">接入文档</a><Link to="/developer/login">登录</Link><Link className="button primary" to="/developer/register">注册开发者</Link></nav></header>;
 }
 
 export function DeveloperLanding() {
-  return <div className="developer-public"><Header /><main><section className="developer-hero"><span>MOONDROP OPEN PLATFORM</span><h1>连接用户与应用，<br />从一个可信身份开始</h1><p>使用标准 OpenID Connect 能力，为 Web、SPA 与原生应用提供安全、稳定、可审计的统一登录。</p><div><Link className="button primary" to="/developer/register">注册开发者</Link><Link className="button secondary" to="/developer/login">登录控制台</Link><Link className="button secondary" to="/developer/docs">查看接入文档</Link></div></section><section className="developer-features"><article><b>01</b><h2>标准协议接入</h2><p>OIDC、OAuth 2.0、PKCE 与 Discovery，降低多端接入成本。</p></article><article><b>02</b><h2>审核与发布</h2><p>开发者资质、应用资料和生产凭据分层审核，状态全程可追踪。</p></article><article><b>03</b><h2>安全身份绑定</h2><p>支持独立开发者账号，也可安全绑定水月雨账号登录。</p></article></section></main></div>;
+  return <div className="developer-public"><DeveloperPublicHeader /><main><section className="developer-hero"><span>MOONDROP OPEN PLATFORM</span><h1>连接用户与应用，<br />从一个可信身份开始</h1><p>使用标准 OpenID Connect 能力，为 Web、SPA 与原生应用提供安全、稳定、可审计的统一登录。</p><div><Link className="button primary" to="/developer/register">注册开发者</Link><Link className="button secondary" to="/developer/login">登录控制台</Link><Link className="button secondary" to="/developer/docs">查看接入文档</Link></div></section><section className="developer-features"><article><b>01</b><h2>标准协议接入</h2><p>OIDC、OAuth 2.0、PKCE 与 Discovery，降低多端接入成本。</p></article><article><b>02</b><h2>审核与发布</h2><p>开发者资质、应用资料和生产凭据分层审核，状态全程可追踪。</p></article><article><b>03</b><h2>安全身份绑定</h2><p>支持独立开发者账号，也可安全绑定水月雨账号登录。</p></article></section></main></div>;
 }
 
 function AuthLayout({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
-  return <div className="developer-auth-page"><Header /><main><section className="developer-auth-copy"><span>MOONDROP DEVELOPER</span><h1>面向开发者的<br />统一身份基础设施</h1><p>一个控制台管理开发者资料、应用审核和 OIDC 客户端凭据。</p></section><section className="developer-auth-card"><h2>{title}</h2><p>{subtitle}</p>{children}</section></main></div>;
+  return <div className="developer-auth-page"><DeveloperPublicHeader /><main><section className="developer-auth-copy"><span>MOONDROP DEVELOPER</span><h1>面向开发者的<br />统一身份基础设施</h1><p>一个控制台管理开发者资料、应用审核和 OIDC 客户端凭据。</p></section><section className="developer-auth-card"><h2>{title}</h2><p>{subtitle}</p>{children}</section></main></div>;
 }
 
 export function DeveloperLogin() {

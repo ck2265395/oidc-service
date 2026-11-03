@@ -4,7 +4,7 @@
 - `GET /health/ready` checks the OIDC database, read-only account database, and Redis; it returns `503` when a required dependency is unavailable.
 - Login throttling defaults to 10 attempts per resolved account and 100 per trusted source IP within 15 minutes. `loginRateLimit` can tune these values in protected configuration; Redis failures reject login attempts.
 
-The public service landing page is served at `/`. The user portal provides `/portal/profile` and `/portal/authorizations`, the public developer portal and developer console share `/developer/*`, and the administrator sign-in is at `/admin/login`. Static console assets are served under `/app/assets/`. Developer email registration and password login use `/api/v1/developer-auth/*`; MOONDROP login starts at `/developer/login/moondrop` and requires an explicit create-or-bind decision before a developer session is established.
+The public developer portal is served at `/`, with public registration, login and documentation under `/developer/register`, `/developer/login` and `/developer/docs`. Authenticated developer pages live only under `/developer/console/*`. The former `/account/*` React console is not exposed; OIDC end-user profile and authorization backend routes remain available for protocol integrations. Administrator pages remain direct-access routes under `/admin/*` and are not linked from the public portal. Static console assets are served under `/app/assets/`. Developer email registration and password login use `/api/v1/developer-auth/*`; MOONDROP login starts at `/developer/login/moondrop` and requires an explicit create-or-bind decision before a developer session is established.
 
 Consumer account APIs require an active MOONDROP OIDC-provider session. Developer APIs require the separate developer session unless explicitly marked public, and administrator APIs require the isolated administrator session. Successful responses use:
 
@@ -59,7 +59,7 @@ Use the returned revision for subsequent profile updates. Submit the completed p
 - `POST /api/v1/developer/review/submit` submits the completed profile and requires `expectedRevision`.
 - `GET /api/v1/developer/review/history` returns the authenticated developer's immutable review history.
 
-Public UI routes are `/developer`, `/developer/login`, `/developer/register`, `/developer/bind`, and `/developer/docs`. Routes under `/developer/console/*` are private and resolve the developer session before returning account data.
+Public UI routes are `/`, `/developer/login`, `/developer/register`, `/developer/bind`, and `/developer/docs`; `/developer` redirects to `/`. Routes under `/developer/console/*` are private and resolve the developer session before returning account data.
 
 ## Application groups
 
