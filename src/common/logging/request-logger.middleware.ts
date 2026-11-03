@@ -1,13 +1,13 @@
 import type { LoggerService } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 
-import { classifyRoute, type HttpLogRecord } from './log-record.js';
+import { classifyRoute, normalizeLogPath, type HttpLogRecord } from './log-record.js';
 
 export function requestLogger(logger: Pick<LoggerService, 'log'>) {
   return (request: Request, response: Response, next: NextFunction): void => {
     const started = performance.now();
+    const path = normalizeLogPath(request.path || '/');
     response.once('finish', () => {
-      const path = request.path || '/';
       const record: HttpLogRecord = {
         event: 'http_request',
         requestId: String(response.locals.requestId),

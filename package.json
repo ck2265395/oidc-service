@@ -12,9 +12,9 @@
   },
   "scripts": {
     "dev": "node --env-file=.env.local node_modules/tsx/dist/cli.mjs watch src/main.ts",
-    "dev:nest": "node --env-file=.env.local node_modules/tsx/dist/cli.mjs watch src/nest-main.ts",
+    "dev:once": "node --env-file=.env.local node_modules/tsx/dist/cli.mjs src/main.ts",
     "start": "node dist/src/main.js",
-    "start:nest": "node dist/src/nest-main.js",
+    "start:legacy": "node dist/src/legacy-main.js",
     "build": "npm run build:server && npm run build:web",
     "build:server": "tsc -p tsconfig.json",
     "build:web": "npm run build --workspace web",

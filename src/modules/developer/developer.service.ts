@@ -8,9 +8,10 @@ import type { DeveloperAccount, DeveloperStatus } from '../../developer-identity
 import type { DeveloperSessionService } from '../../developer-session.js';
 import type { PostgresDeveloperStore } from '../../developer-store.js';
 
-export interface DeveloperStorePort extends Pick<PostgresDeveloperStore, 'getProfile' | 'saveProfile' | 'submitReview' | 'listReviewHistory' | 'findByExternalIdentity' | 'createExternalAccount' | 'bindExternalIdentity'> {}
+export type DeveloperStorePort = Pick<PostgresDeveloperStore, 'getProfile' | 'saveProfile' | 'submitReview' | 'listReviewHistory' | 'findByExternalIdentity' | 'createExternalAccount' | 'bindExternalIdentity'>;
 export interface MoondropSubjectPort { subject(request: Request, response: Response): Promise<string | null>; }
 export interface DeveloperCredentialPort { login(email: string, password: string): Promise<string>; }
+export interface DeveloperEmailVerificationPort { request(accountUuid: string): Promise<'sent' | 'already_verified'>; consume(token: string): Promise<boolean>; }
 
 function cookie(request: Request, name: string): string | null {
   for (const part of (request.headers.cookie ?? '').split(';')) {
@@ -24,6 +25,7 @@ function cookie(request: Request, name: string): string | null {
 
 @Injectable()
 export class DeveloperService {
+  private emailVerification: DeveloperEmailVerificationPort | null = null;
   constructor(
     readonly config: ServiceConfig,
     private readonly sessions: Pick<DeveloperSessionService, 'resolve' | 'create'>,
@@ -51,4 +53,8 @@ export class DeveloperService {
     const token = await this.sessions.create(developerId);
     response.cookie('md-developer', token, { httpOnly: true, sameSite: 'lax', secure: this.config.issuer.startsWith('https:'), path: '/', maxAge: 7 * 24 * 60 * 60 * 1000 });
   }
+  attachEmailVerification(verification: DeveloperEmailVerificationPort | null): void { this.emailVerification = verification; }
+  hasEmailVerification(): boolean { return this.emailVerification !== null; }
+  requestEmailVerification(accountUuid: string): Promise<'sent' | 'already_verified'> | null { return this.emailVerification?.request(accountUuid) ?? null; }
+  consumeEmailVerification(token: string): Promise<boolean> | null { return this.emailVerification?.consume(token) ?? null; }
 }

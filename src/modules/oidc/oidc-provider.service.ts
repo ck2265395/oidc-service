@@ -60,6 +60,9 @@ export class OidcProviderService implements OnModuleInit {
 
   get provider(): Provider { if (!this.providerValue) throw new Error('OIDC provider is not initialized'); return this.providerValue; }
   mountProtocol(app: Express): void {
+    if (!this.interactionRouter || !this.portalRouter) throw new Error('OIDC business routers are not initialized');
+    app.use('/interaction', this.interactionRouter);
+    app.use('/portal', this.portalRouter);
     app.use((request: Request, response: Response, next: NextFunction) => {
       if (!isProtocolPath(request.path)) { next(); return; }
       const started = performance.now(); const endpoint = request.path; const requestId = String(response.locals.requestId ?? '');

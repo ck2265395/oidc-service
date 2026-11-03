@@ -1,5 +1,7 @@
 # API guide
 
+The default server is the NestJS modular runtime described in [nestjs-architecture.md](nestjs-architecture.md). Native OIDC protocol responses are produced directly by `oidc-provider`; business APIs retain their existing response shapes.
+
 - `GET /health/live` reports process liveness.
 - `GET /health/ready` checks the OIDC database, read-only account database, and Redis; it returns `503` when a required dependency is unavailable.
 - Login throttling defaults to 10 attempts per resolved account and 100 per trusted source IP within 15 minutes. `loginRateLimit` can tune these values in protected configuration; Redis failures reject login attempts.

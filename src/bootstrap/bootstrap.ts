@@ -37,6 +37,7 @@ export async function bootstrapNest(options: BootstrapOptions = {}): Promise<Nes
     : options.logger === false ? { log: () => undefined } : new Logger('HTTP');
   configureHttpFoundation(app.getHttpAdapter().getInstance() as Express, config.get(), requestLogger);
   (app.getHttpAdapter().getInstance() as Express).use('/api', express.json({ limit: '32kb' }));
+  (app.getHttpAdapter().getInstance() as Express).use('/api', express.urlencoded({ extended: false, limit: '16kb', parameterLimit: 20 }));
   if (options.infrastructure) {
     const oidc = app.get(OidcProviderService);
     await oidc.initialize();

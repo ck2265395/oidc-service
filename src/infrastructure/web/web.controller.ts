@@ -1,4 +1,4 @@
-import { Controller, Get, NotFoundException, Param, Res } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, Query, Redirect, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { resolve, sep } from 'node:path';
 
@@ -32,6 +32,13 @@ export class WebController {
   @Get('admin/login')
   adminLogin(): never { throw new NotFoundException(); }
 
-  @Get(['developer', 'developer/{*path}', 'account', 'account/{*path}', 'admin', 'admin/{*path}'])
+  @Get('developer/login/moondrop')
+  @Redirect()
+  moondropLogin(@Query('returnTo') value?: string) { const target = value && /^\/(?:developer|account)(?:\/|$)/.test(value) ? value : '/developer/console/overview'; return { statusCode: 303, url: '/portal/sign-in?return=' + encodeURIComponent('/developer/bind?returnTo=' + encodeURIComponent(target)) }; }
+
+  @Get('developer') @Redirect('/developer/overview', 303) developer(): void {}
+  @Get('account') @Redirect('/account/profile', 303) account(): void {}
+
+  @Get(['developer/{*path}', 'account/{*path}', 'admin', 'admin/{*path}'])
   console(@Res() response: Response): void { response.sendFile(consoleIndex); }
 }

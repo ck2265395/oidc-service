@@ -6,7 +6,7 @@ The identity platform uses a logically separated frontend and backend while keep
 
 - `web/` is an independent React, TypeScript and Vite workspace.
 - Vite emits immutable frontend assets into `public/app/`.
-- Express serves the compiled shell for `/`, `/account/*`, `/developer/*` and `/admin/*`.
+- NestJS serves the compiled shell through its Express adapter for `/`, `/account/*`, `/developer/*` and `/admin/*`.
 - Business data is available only through `/api/v1/account/*`, `/api/v1/developer/*` and `/api/v1/admin/*`.
 - OIDC login and consent remain server-rendered protocol interactions. This keeps passwords, interaction identifiers and consent submission outside the SPA state model.
 - Administrator login remains a server endpoint at `/admin/login`; the authenticated workspace is the React console.

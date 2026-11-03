@@ -17,7 +17,7 @@ const input = () => ({
   redisUrl: 'redis://localhost:6379/0',
 });
 
-test('parallel Nest runtime loads the protected config and starts without replacing the legacy entry point', async (context) => {
+test('Nest runtime loads protected configuration and supports isolated bootstrap', async (context) => {
   const path = join(tmpdir(), `oidc-nest-config-${randomBytes(8).toString('hex')}.json`);
   await writeFile(path, JSON.stringify(input()), { encoding: 'utf8', mode: 0o600 });
   context.after(async () => { await import('node:fs/promises').then(({ unlink }) => unlink(path).catch(() => undefined)); });
@@ -36,5 +36,5 @@ test('parallel Nest runtime loads the protected config and starts without replac
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as { scripts: Record<string, string> };
   assert.match(pkg.scripts.dev ?? '', /src\/main\.ts/);
   assert.equal(pkg.scripts.start, 'node dist/src/main.js');
-  assert.match(pkg.scripts['dev:nest'] ?? '', /src\/nest-main\.ts/);
+  assert.equal(pkg.scripts['dev:nest'], undefined);
 });

@@ -25,6 +25,9 @@ test('Nest web contract preserves health and SPA hosting', async (context) => {
   assert.equal((await fetch(base + '/health/ready')).status, 503);
   assert.equal((await fetch(base + '/')).status, 200);
   assert.equal((await fetch(base + '/developer/console/overview')).status, 200);
+  const developer = await fetch(base + '/developer', { redirect: 'manual' }); assert.equal(developer.status, 303); assert.equal(developer.headers.get('location'), '/developer/overview');
+  const account = await fetch(base + '/account', { redirect: 'manual' }); assert.equal(account.status, 303); assert.equal(account.headers.get('location'), '/account/profile');
+  const moondrop = await fetch(base + '/developer/login/moondrop?returnTo=%2Fdeveloper%2Fapplications', { redirect: 'manual' }); assert.equal(moondrop.status, 303); assert.match(moondrop.headers.get('location') ?? '', /^\/portal\/sign-in/);
   assert.equal((await fetch(base + '/account/profile')).status, 200);
   assert.equal((await fetch(base + '/admin/applications')).status, 200);
   assert.equal((await fetch(base + '/admin/login')).status, 404);

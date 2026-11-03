@@ -95,3 +95,17 @@ test('Nest developer API preserves profile completeness and optimistic review co
   const submit = await fetch(target.base + '/api/v1/developer/review/submit', { method: 'POST', headers, body: JSON.stringify({ expectedRevision: 1 }) });
   assert.equal(submit.status, 400); assert.equal((await submit.json() as { code: string }).code, 'profile_incomplete');
 });
+
+test('Nest developer API preserves contact email verification routes', async (context) => {
+  const target = await service(); context.after(target.close);
+  const csrf = 'v'.repeat(43);
+  const response = await fetch(target.base + '/api/v1/developer/profile/verification-email', { method: 'POST', headers: {
+    origin: 'https://identity.example.test', cookie: `md-developer=${'s'.repeat(43)}; __Host-dt-api-csrf=${csrf}`, 'x-csrf-token': csrf,
+  } });
+  assert.equal(response.status, 503);
+  assert.equal((await response.json() as { code: string }).code, 'email_delivery_unavailable');
+
+  const confirm = await fetch(target.base + '/api/v1/developer/verify-email?token=' + 't'.repeat(43));
+  assert.equal(confirm.status, 400);
+  assert.match(await confirm.text(), /invalid or expired/i);
+});

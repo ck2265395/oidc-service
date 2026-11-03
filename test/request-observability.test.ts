@@ -14,6 +14,7 @@ async function service(trustedProxyCidrs: string[] = []) {
   app.use(express.json());
   app.all('/probe', (request, response) => response.json({ requestId: response.locals.requestId, protocol: request.protocol, ip: request.ip }));
   app.all('/token', (_request, response) => response.status(201).json({ ok: true }));
+  const interaction = express.Router(); interaction.get('/:uid', (_request, response) => response.sendStatus(200)); app.use('/interaction', interaction);
   const server = createServer(app);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
@@ -43,6 +44,15 @@ test('normalizes protocol paths without query strings', async (context) => {
   assert.equal((target.records[0] as { path: string }).path, '/token');
   assert.equal((target.records[0] as { routeKind: string }).routeKind, 'protocol');
   assert.doesNotMatch(JSON.stringify(target.records[0]), /protocol-canary/);
+});
+
+test('normalizes interaction identifiers before mounted routers rewrite request paths', async (context) => {
+  const target = await service(); context.after(target.close);
+  await fetch(target.baseUrl + '/interaction/sensitive-interaction-identifier');
+  const record = target.records[0] as { path: string; routeKind: string };
+  assert.equal(record.path, '/interaction/:uid');
+  assert.equal(record.routeKind, 'protocol');
+  assert.doesNotMatch(JSON.stringify(record), /sensitive-interaction-identifier/);
 });
 
 test('preserves supplied request IDs only when syntactically safe', async (context) => {

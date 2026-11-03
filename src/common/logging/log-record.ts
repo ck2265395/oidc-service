@@ -16,8 +16,14 @@ const protocolPaths = new Set([
 ]);
 
 export function classifyRoute(path: string): RouteKind {
-  if (path === '/health' || path === '/ready') return 'health';
-  if (path.startsWith('/.well-known/') || protocolPaths.has(path)) return 'protocol';
+  if (path.startsWith('/health/')) return 'health';
+  if (path.startsWith('/.well-known/') || path.startsWith('/interaction/') || path.startsWith('/auth/') || protocolPaths.has(path)) return 'protocol';
   if (/\.[A-Za-z0-9]{1,8}$/.test(path)) return 'static';
   return 'business';
+}
+
+export function normalizeLogPath(path: string): string {
+  if (/^\/interaction\/[^/]+(?:\/(?:login|consent))?$/.test(path)) return path.replace(/^\/interaction\/[^/]+/, '/interaction/:uid');
+  if (/^\/auth\/[^/]+$/.test(path)) return '/auth/:uid';
+  return path || '/';
 }

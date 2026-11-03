@@ -43,6 +43,16 @@ export function createProvider(
     }],
     jwks: signingKeys,
     scopes: ['openid', 'profile', 'email'],
+    subjectTypes: ['pairwise'],
+    pairwiseIdentifier: async (_ctx, accountId, client) => {
+      const handle = parseAccountHandle(accountId); const clientId = client.clientId;
+      if (!handle || !clientId) throw new Error('OIDC subject resolution failed');
+      const active = clientId === PORTAL_CLIENT_ID ? null : await applications.activeClient(clientId);
+      if (clientId !== PORTAL_CLIENT_ID && !active) throw new Error('OIDC subject resolution failed');
+      const identity = await accounts.resolve(handle.uuid, handle.fingerprint, active?.config.groupId ?? clientId);
+      if (!identity) throw new Error('OIDC subject resolution failed');
+      return identity.sub;
+    },
     findAccount: async (ctx, accountId) => {
       const handle = parseAccountHandle(accountId);
       const clientId = ctx.oidc.client?.clientId;

@@ -126,6 +126,16 @@ The Compose PostgreSQL initialization runs `sql/postgre.sql` only when the data 
 - Back up PostgreSQL and Redis data volumes using the platform’s approved backup process. Signing keys and service secrets require separate encrypted backup and access controls.
 - Rotate signing keys with a planned JWKS overlap and client coordination. The current key loader accepts one active RS256 signing key; automated rotation is not implemented.
 
+### NestJS cutover, clustering, and rollback
+
+`npm start` now launches the NestJS runtime from `dist/src/main.js`. Run migrations once before starting or rolling the cluster, then replace instances gradually while checking `/health/ready`. PM2 cluster workers may share PostgreSQL and Redis, but every worker must mount the same protected configuration and signing-key files. Account, developer, administrator, and OIDC state must never be kept only in worker memory.
+
+The migration release retains `npm run start:legacy` for local emergency diagnosis. Production rollback is to redeploy the previous tested image/tag together with its documented database compatibility; do not run the legacy and Nest images concurrently behind the same issuer during rollback. If a release introduced a database migration, follow that migration's rollback/forward-repair instructions before accepting traffic.
+
+Acceptance for each target environment includes: migration success, `/health/live` and `/health/ready`, developer email registration/login, profile update and review submission, administrator review, approved-client Authorization Code with S256 PKCE, token/user-info/revocation/logout, static console assets, safe request logs, and graceful SIGTERM. Confirm reverse-proxy trust and secure-cookie behavior from both trusted and untrusted source networks.
+
+Request completion logs contain only bounded metadata documented in [NestJS backend architecture](nestjs-architecture.md). Treat any query string, body, header, cookie, credential, code, token, secret, database URL, or SMTP value in logs as a release blocker.
+
 ## Deployment acceptance still required
 
 The repository does not include access to the actual account database, production proxy, secret manager, SMTP relay, or deployment platform. Validate the read-only role, database schema, proxy trust boundaries, Redis durability/availability, issuer discovery, client flows, backup/restore, and rolling multi-instance behavior in the target environment before production use. This repository's CI runs unit and HTTP checks; it does not claim a live production-like PostgreSQL and Redis acceptance run.

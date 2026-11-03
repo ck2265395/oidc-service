@@ -53,3 +53,16 @@ test('ReplayDetection rejects duplicate writes and fails closed when Redis is ab
   const unavailable = new PostgresOidcAdapter('ReplayDetection', {} as Pool, {} as ApplicationService);
   await assert.rejects(unavailable.upsert('another-id', payload, 45), /OIDC replay storage is unavailable/);
 });
+
+test('PostgreSQL adapter offsets lookup parameters after the model discriminator', async () => {
+  const calls: Array<{ sql: string; values: unknown[] }> = [];
+  const pool = { async query(sql: string, values: unknown[]) { calls.push({ sql, values }); return { rows: [] }; } } as unknown as Pool;
+  const adapter = new PostgresOidcAdapter('Interaction', pool, {} as ApplicationService);
+  await adapter.find('document-id');
+  await adapter.findByUid('interaction-uid');
+  await adapter.findByUserCode('user-code');
+  assert.deepEqual(calls.map((call) => call.values), [
+    ['Interaction', 'document-id'], ['Interaction', 'interaction-uid'], ['Interaction', 'user-code'],
+  ]);
+  for (const call of calls) assert.match(call.sql, /= \$2/);
+});

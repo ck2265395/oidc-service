@@ -1,5 +1,7 @@
 # DT Identity Service
 
+> Backend runtime: NestJS 12 modular monolith on Node.js 24, with `oidc-provider` mounted natively through the Express adapter. See [docs/nestjs-architecture.md](docs/nestjs-architecture.md). The temporary `npm run start:legacy` command is rollback-only for the migration release.
+
 独立开发的 OIDC 身份服务项目，项目署名使用 **DT／东土**。实现仍在开发中，不可用于生产环境。
 
 ## 技术基线

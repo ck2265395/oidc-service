@@ -88,15 +88,15 @@ export class PostgresOidcAdapter implements Adapter {
         throw new Error('OIDC replay storage read failed');
       }
     }
-    return this.fetch('document_id = $1', [id]);
+    return this.fetch('document_id = $2', [id]);
   }
 
   async findByUserCode(userCode: string): Promise<AdapterPayload | undefined> {
-    return this.fetch("payload->>'userCode' = $1", [userCode]);
+    return this.fetch("payload->>'userCode' = $2", [userCode]);
   }
 
   async findByUid(uid: string): Promise<AdapterPayload | undefined> {
-    return this.fetch("payload->>'uid' = $1", [uid]);
+    return this.fetch("payload->>'uid' = $2", [uid]);
   }
 
   async consume(id: string): Promise<void> {

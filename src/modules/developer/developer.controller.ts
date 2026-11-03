@@ -1,7 +1,8 @@
-import { Body, Controller, Get, HttpCode, Inject, Post, Put, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Post, Put, Query, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
 import { DeveloperReviewError } from '../../developer-store.js';
+import { EmailVerificationError } from '../../email-verification.js';
 import { randomToken } from '../../security.js';
 import { DeveloperService } from './developer.service.js';
 
@@ -75,6 +76,38 @@ export class DeveloperController {
     const id = await this.owner(request, response); if (!id) return;
     try { response.json({ code: 0, desc: 'ok', data: await this.service.store.listReviewHistory(id) }); }
     catch { jsonError(response, 503, 'storage_unavailable', 'Developer review history is unavailable'); }
+  }
+
+  @Post('profile/verification-email')
+  async requestVerification(@Req() request: Request, @Res() response: Response): Promise<void> {
+    if (!this.write(request, response)) return;
+    const id = await this.owner(request, response); if (!id) return;
+    const pending = this.service.requestEmailVerification(id);
+    if (!pending) { jsonError(response, 503, 'email_delivery_unavailable', 'Email verification is not configured'); return; }
+    try { const result = await pending; response.status(result === 'sent' ? 202 : 200).json({ code: 0, desc: 'ok', data: result }); }
+    catch (cause) {
+      if (cause instanceof EmailVerificationError) { jsonError(response, cause.message.includes('recently') ? 429 : cause.message.includes('profile') ? 409 : 503, 'verification_unavailable', cause.message); return; }
+      jsonError(response, 503, 'email_delivery_unavailable', 'Email verification is unavailable');
+    }
+  }
+
+  @Get('verify-email')
+  verificationPage(@Query('token') token: unknown, @Res() response: Response): void {
+    if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token) || !this.service.hasEmailVerification()) {
+      response.status(400).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Email verification · MOONDROP</title><h1>Verification link is invalid or expired</h1></html>'); return;
+    }
+    response.type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Confirm email · MOONDROP</title><main><h1>Confirm your contact email</h1><p>Continue to verify the contact email on your developer profile.</p><form method="post" action="/api/v1/developer/verify-email"><input type="hidden" name="token" value="' + token + '"><button type="submit">Verify email</button></form></main></html>');
+  }
+
+  @Post('verify-email')
+  async verifyEmail(@Body() value: unknown, @Req() request: Request, @Res() response: Response): Promise<void> {
+    if (request.header('origin') !== new URL(this.service.config.issuer).origin) { response.status(403).type('html').send('<h1>Request origin is not allowed</h1>'); return; }
+    const token = record(value).token;
+    if (typeof token !== 'string') { response.status(400).type('html').send('<h1>Verification link is invalid or expired</h1>'); return; }
+    const pending = this.service.consumeEmailVerification(token);
+    if (!pending) { response.status(400).type('html').send('<h1>Verification link is invalid or expired</h1>'); return; }
+    try { const verified = await pending; response.status(verified ? 200 : 400).type('html').send('<h1>' + (verified ? 'Your contact email is verified.' : 'Verification link is invalid or expired.') + '</h1><a href="/developer">Developer center</a>'); }
+    catch { response.status(503).type('html').send('<h1>Verification is temporarily unavailable</h1>'); }
   }
 
   @Get('moondrop/status')
