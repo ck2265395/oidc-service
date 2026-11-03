@@ -25,6 +25,7 @@
     "dev:web": "npm run dev --workspace web",
     "test:storage": "tsx --test test/storage/*.test.ts",
     "migrate": "node dist/scripts/migrate.js",
+    "migrate:local": "node --env-file=.env.local dist/scripts/migrate.js",
     "clean:expired": "node dist/scripts/clean-expired.js",
     "sbom": "npm sbom --sbom-format=cyclonedx --sbom-type=application --omit=dev > sbom.cdx.json"
   },

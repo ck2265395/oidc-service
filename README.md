@@ -29,10 +29,10 @@ GitHub Actions 在每次分支更新时运行类型检查、Lint、前端/Web/Na
 
 ## 运行准备
 
-1. 复制 config.example.json 到受保护的配置路径，并填入账号只读库、OIDC 数据库、Redis URL、管理员摘要及现有账号系统的 HMAC 密钥；若部署在反向代理后，仅在 `trustedProxyCidrs` 中列出实际代理网段。
-2. 使用 npm run keys -- --out <受保护路径> 生成密钥材料；把其中的 cookie、fingerprint、subject、encryption 值填入配置。
-3. 设置 OIDC_CONFIG_FILE 和 OIDC_SIGNING_KEY_FILE，分别指向受保护配置和密钥文件。
-4. 执行 npm run build，然后运行 npm run migrate 应用版本化数据库迁移。
-5. 执行 npm start。
+1. 本地开发复制 `runtime/config.example.json` 为被 Git 忽略的 `runtime/config.local.json`，并填入账号只读库、OIDC 数据库、Redis、SMTP、管理员摘要及现有账号系统的 HMAC 密钥；若使用反向代理，仅在 `trustedProxyCidrs` 中列出实际代理网段。
+2. 使用 `npm run keys -- --out runtime/signing.local.json` 生成本地签名材料；把生成的 cookie、fingerprint、subject、encryption 值填入本地配置。
+3. 复制 `.env.example` 为 `.env.local`。`npm run dev` 会从该文件读取 `OIDC_CONFIG_FILE` 和 `OIDC_SIGNING_KEY_FILE`，默认指向上述两个本地文件。
+4. 测试和正式环境不复制本地文件，也不提交环境专用 JSON；由部署系统挂载受保护配置和签名文件，并将两个环境变量设置为对应的绝对路径。
+5. 本地执行 `npm run build` 后使用 `npm run migrate:local` 应用版本化数据库迁移，再运行 `npm run dev`。测试和正式环境在部署系统已经注入变量后使用 `npm run migrate` 和 `npm start`。
 
-不要提交实际密钥、管理员凭据、数据库连接串或 .env 文件。服务依赖真实数据库和现有账号库配置；当前分支未完成生产部署验证。
+不要提交 `runtime/config.local.json`、签名材料、实际密钥、管理员凭据、数据库连接串或 `.env` 文件。仓库中的 `runtime/config.example.json` 只描述字段结构，不能直接启动服务。

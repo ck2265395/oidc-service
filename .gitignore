@@ -12,3 +12,6 @@ secrets/
 *.key
 .DS_Store
 /runtime/
+!/runtime/
+/runtime/*
+!/runtime/config.example.json
