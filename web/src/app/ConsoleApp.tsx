@@ -14,6 +14,8 @@ interface SessionData {
   csrfToken: string;
   developerStatus?: 'unsubmitted' | 'pending' | 'approved' | 'rejected' | 'disabled';
   developerReview?: { reason: string | null; reviewedAt: string } | null;
+  developerRevision?: number;
+  authenticationMethods?: Array<'email' | 'moondrop'>;
 }
 interface DeveloperProfile { developerId?: string; accountUuid?: string; displayName: string; contactEmail: string; contactEmailVerified: boolean; contactPhone?: string | null; purpose?: string; revision: number }
 interface ApplicationDraft { name: string; description: string; purpose: string; homepageUrl: string; privacyUrl: string; termsUrl: string; iconUrl: string | null; redirectUris: string[]; postLogoutRedirectUris: string[]; scopes: string[]; groupId: string | null }
@@ -29,7 +31,7 @@ interface StatisticRecord { action: string; outcome: string; request_count: numb
 
 const consoleCopy: Record<ConsoleKind, { label: string; title: string; items: Array<[string, string]> }> = {
   account: { label: '账号中心', title: '个人账号', items: [['/account/profile', '个人资料'], ['/account/authorizations', '应用授权']] },
-  developer: { label: '开发者控制台', title: '开发者空间', items: [['/developer/overview', '概览'], ['/developer/profile', '开发者资料'], ['/developer/applications', '我的应用'], ['/developer/groups', '应用组'], ['/developer/docs', '接入文档']] },
+  developer: { label: '开发者控制台', title: '开发者空间', items: [['/developer/console/overview', '概览'], ['/developer/console/profile', '个人资料'], ['/developer/console/review', '开发者审核'], ['/developer/console/applications', '我的应用'], ['/developer/console/groups', '应用组'], ['/developer/console/security', '安全设置'], ['/developer/docs', '接入文档']] },
   admin: { label: '运营管理后台', title: '平台管理', items: [['/admin/overview', '概览'], ['/admin/developers', '开发者审核'], ['/admin/applications', '应用审核'], ['/admin/groups', '应用组审核'], ['/admin/audit', '操作审计'], ['/admin/statistics', '统计分析']] },
 };
 
@@ -69,7 +71,7 @@ function DeveloperOverview() {
   });
   if (!resource.data) return <Feedback loading={resource.loading} error={resource.error} />;
   const pending = resource.data.applications.list.filter((item) => item.status === 'pending').length;
-  return <><div className="metric-grid"><article><span>已接入应用</span><strong>{resource.data.applications.total}</strong><small>全部 OIDC 客户端</small></article><article><span>应用组</span><strong>{resource.data.groups.total}</strong><small>组织与权限边界</small></article><article><span>待审核</span><strong>{pending}</strong><small>正在等待平台审核</small></article><article><span>联系邮箱</span><strong className="metric-word">{resource.data.profile?.contactEmailVerified ? '已验证' : '待完善'}</strong><small>{resource.data.profile?.contactEmail || '尚未注册开发者资料'}</small></article></div><section className="panel"><div className="panel-heading"><div><span>RECENT APPLICATIONS</span><h2>最近的应用</h2></div><Link to="/developer/applications">查看全部 →</Link></div><DataTable headers={['应用名称', '客户端类型', 'Client ID', '状态']} empty="还没有创建应用">{resource.data.applications.list.slice(0, 5).map((item) => <tr key={item.id}><td><strong>{item.draft.name}</strong></td><td>{item.type.toUpperCase()}</td><td><code>{item.clientId}</code></td><td><Status value={item.status} /></td></tr>)}</DataTable></section></>;
+  return <><div className="metric-grid"><article><span>已接入应用</span><strong>{resource.data.applications.total}</strong><small>全部 OIDC 客户端</small></article><article><span>应用组</span><strong>{resource.data.groups.total}</strong><small>组织与权限边界</small></article><article><span>待审核</span><strong>{pending}</strong><small>正在等待平台审核</small></article><article><span>联系邮箱</span><strong className="metric-word">{resource.data.profile?.contactEmailVerified ? '已验证' : '待完善'}</strong><small>{resource.data.profile?.contactEmail || '尚未注册开发者资料'}</small></article></div><section className="panel"><div className="panel-heading"><div><span>RECENT APPLICATIONS</span><h2>最近的应用</h2></div><Link to="/developer/console/applications">查看全部 →</Link></div><DataTable headers={['应用名称', '客户端类型', 'Client ID', '状态']} empty="还没有创建应用">{resource.data.applications.list.slice(0, 5).map((item) => <tr key={item.id}><td><strong>{item.draft.name}</strong></td><td>{item.type.toUpperCase()}</td><td><code>{item.clientId}</code></td><td><Status value={item.status} /></td></tr>)}</DataTable></section></>;
 }
 
 function DeveloperProfilePage() {
@@ -89,22 +91,35 @@ function DeveloperProfilePage() {
     try { await developerMutation('/api/v1/developer/profile/verification-email', 'POST', {}); setMessage('验证邮件已发送，请检查收件箱'); }
     catch (reason) { setMessage(reason instanceof Error ? reason.message : '发送失败'); }
   };
-  const submitReview = async () => {
-    setMessage('正在提交审核…');
-    try {
-      const session = await apiGet<{ account: { revision: number } | null }>('/api/v1/developer-auth/session');
-      if (!session.account) throw new Error('开发者会话已失效');
-      await developerMutation('/api/v1/developer/review/submit', 'POST', { expectedRevision: session.account.revision });
-      setMessage('资料已提交审核');
-    } catch (reason) { setMessage(reason instanceof Error ? reason.message : '提交审核失败'); }
-  };
-  return <section className="panel form-panel"><div className="panel-heading"><div><span>DEVELOPER PROFILE</span><h2>开发者资料</h2><p>完善资料并主动提交，管理员审核通过后才能创建应用。</p></div>{profile && <Status value={profile.contactEmailVerified ? 'verified' : 'unverified'} />}</div><form className="form-grid" onSubmit={save}><label><span>开发者名称</span><input name="displayName" required maxLength={100} defaultValue={profile?.displayName || ''} /></label><label><span>联系邮箱</span><input name="contactEmail" type="email" required defaultValue={profile?.contactEmail || ''} /></label><label><span>联系电话（选填）</span><input name="contactPhone" maxLength={50} defaultValue={profile?.contactPhone || ''} /></label><label className="full-field"><span>接入用途</span><textarea name="purpose" required maxLength={2000} defaultValue={profile?.purpose || ''} /></label><div className="form-actions"><button className="button primary" type="submit">保存资料</button><button className="button secondary" type="button" onClick={() => void submitReview()}>提交开发者审核</button>{profile && !profile.contactEmailVerified && <button className="button secondary" type="button" onClick={() => void verifyEmail()}>发送验证邮件</button>}<span role="status">{message}</span></div></form><ReviewHistory /></section>;
+  return <section className="panel form-panel"><div className="panel-heading"><div><span>PERSONAL PROFILE</span><h2>个人资料</h2><p>维护开发者名称、联系方式和接入用途。审核操作在“开发者审核”中单独管理。</p></div>{profile && <Status value={profile.contactEmailVerified ? 'verified' : 'unverified'} />}</div><form className="form-grid" onSubmit={save}><label><span>开发者名称</span><input name="displayName" required maxLength={100} defaultValue={profile?.displayName || ''} /></label><label><span>联系邮箱</span><input name="contactEmail" type="email" required defaultValue={profile?.contactEmail || ''} /></label><label><span>联系电话（选填）</span><input name="contactPhone" maxLength={50} defaultValue={profile?.contactPhone || ''} /></label><label className="full-field"><span>接入用途</span><textarea name="purpose" required maxLength={2000} defaultValue={profile?.purpose || ''} /></label><div className="form-actions"><button className="button primary" type="submit">保存资料</button>{profile && !profile.contactEmailVerified && <button className="button secondary" type="button" onClick={() => void verifyEmail()}>发送验证邮件</button>}<span role="status">{message}</span></div></form></section>;
 }
 
 function ReviewHistory() {
   const resource = useResource(() => apiGet<Array<{ action: string; reason: string | null; created_at: string }>>('/api/v1/developer/review/history'));
-  if (!resource.data?.length) return null;
-  return <div className="review-history"><h3>审核记录</h3><ul>{resource.data.map((item, index) => <li key={`${item.created_at}-${index}`}><Status value={item.action === 'reject' ? 'rejected' : item.action === 'approve' ? 'approved' : 'pending'} /><span>{item.reason || '无附加说明'}</span><time>{new Date(item.created_at).toLocaleString('zh-CN')}</time></li>)}</ul></div>;
+  if (resource.loading || resource.error) return <Feedback loading={resource.loading} error={resource.error} />;
+  return <div className="review-history"><h3>审核记录</h3>{resource.data?.length ? <ul>{resource.data.map((item, index) => <li key={`${item.created_at}-${index}`}><Status value={item.action === 'reject' ? 'rejected' : item.action === 'approve' ? 'approved' : 'pending'} /><span>{item.reason || '无附加说明'}</span><time>{new Date(item.created_at).toLocaleString('zh-CN')}</time></li>)}</ul> : <p>尚无审核记录。</p>}</div>;
+}
+
+function DeveloperReviewPage({ revision, status }: { revision?: number; status?: SessionData['developerStatus'] }) {
+  const [message, setMessage] = useState('');
+  const submitReview = async () => {
+    setMessage('正在提交审核…');
+    try {
+      const currentRevision = revision ?? (await apiGet<{ account: { revision: number } | null }>('/api/v1/developer-auth/session')).account?.revision;
+      if (!currentRevision) throw new Error('开发者会话缺少有效版本，请刷新后重试');
+      await developerMutation('/api/v1/developer/review/submit', 'POST', { expectedRevision: currentRevision });
+      setMessage('资料已提交审核');
+    } catch (reason) { setMessage(reason instanceof Error ? reason.message : '提交审核失败'); }
+  };
+  const canSubmit = status === 'unsubmitted' || status === 'rejected';
+  return <section className="panel"><div className="panel-heading"><div><span>DEVELOPER REVIEW</span><h2>开发者审核</h2><p>完善个人资料后手动提交审核，审核通过后才可创建应用。</p></div>{status && <Status value={status} />}</div><div className="form-actions">{canSubmit && <button className="button primary" type="button" onClick={() => void submitReview()}>提交开发者审核</button>}<span role="status">{message}</span></div><ReviewHistory /></section>;
+}
+
+function DeveloperSecurityPage({ methods }: { methods?: Array<'email' | 'moondrop'> }) {
+  const resource = useResource(() => methods ? Promise.resolve(methods) : apiGet<{ authenticationMethods: Array<'email' | 'moondrop'> }>('/api/v1/developer-auth/session').then((session) => session.authenticationMethods));
+  const methodLabel = { email: '邮箱密码', moondrop: '水月雨账号' } as const;
+  if (!resource.data) return <Feedback loading={resource.loading} error={resource.error} />;
+  return <section className="panel"><div className="panel-heading"><div><span>ACCOUNT SECURITY</span><h2>安全设置</h2><p>这里仅展示当前开发者账号已经实际绑定的认证方式。</p></div></div><div className="security-methods">{resource.data.map((method) => <article key={method}><div><strong>{methodLabel[method]}</strong><p>{method === 'email' ? '使用开发者邮箱与密码登录' : '使用已绑定的水月雨账号登录'}</p></div><Status value="verified" /></article>)}</div><div className="security-unavailable"><article><strong>修改密码</strong><span>暂未开放</span></article><article><strong>解绑认证方式</strong><span>暂未开放</span></article><article><strong>会话管理</strong><span>暂未开放</span></article></div></section>;
 }
 
 function ApplicationsPage({ canCreate }: { canCreate: boolean }) {
@@ -135,7 +150,7 @@ function ApplicationsPage({ canCreate }: { canCreate: boolean }) {
     try { await developerMutation(`/api/v1/developer/applications/${item.id}/submit`, 'POST', { expectedRevision: item.revision }); setMessage('应用已提交审核'); resource.reload(); }
     catch (error) { setMessage(error instanceof Error ? error.message : '提交失败'); }
   };
-  return <>{clientSecret && <section className="secret-notice"><strong>请立即保存 Client Secret</strong><p>该密钥只展示一次，关闭后无法再次查看。</p><code>{clientSecret}</code></section>}{creating && canCreate && <ApplicationDraftForm title="创建应用" submitLabel="创建草稿" onCancel={() => setCreating(false)} onSubmit={create} message={message} /> }<section className="panel"><div className="panel-heading"><div><span>OIDC CLIENTS</span><h2>我的应用</h2><p>管理客户端配置、审核状态和生产凭据。</p>{!canCreate && <small>开发者审核通过后可创建应用</small>}</div><button className="button primary" type="button" disabled={!canCreate} onClick={() => setCreating(true)}>创建应用</button></div><span className="operation-message" role="status">{message}</span><DataTable headers={['应用名称', '类型', 'Client ID', '版本', '状态', '操作']} empty="还没有应用">{resource.data.list.map((item) => <tr key={item.id}><td><Link className="table-link" to={`/developer/applications/${item.id}`}><strong>{item.draft.name}</strong></Link><small className="cell-note">{item.draft.description || '暂无描述'}</small></td><td>{item.type.toUpperCase()}</td><td><code>{item.clientId}</code></td><td>v{item.revision}</td><td><Status value={item.status} /></td><td><div className="row-actions">{(item.status === 'draft' || item.status === 'rejected') && <button type="button" onClick={() => void submit(item)}>提交审核</button>}</div></td></tr>)}</DataTable></section></>;
+  return <>{clientSecret && <section className="secret-notice"><strong>请立即保存 Client Secret</strong><p>该密钥只展示一次，关闭后无法再次查看。</p><code>{clientSecret}</code></section>}{creating && canCreate && <ApplicationDraftForm title="创建应用" submitLabel="创建草稿" onCancel={() => setCreating(false)} onSubmit={create} message={message} /> }<section className="panel"><div className="panel-heading"><div><span>OIDC CLIENTS</span><h2>我的应用</h2><p>管理客户端配置、审核状态和生产凭据。</p>{!canCreate && <small>开发者审核通过后可创建应用</small>}</div><button className="button primary" type="button" disabled={!canCreate} onClick={() => setCreating(true)}>创建应用</button></div><span className="operation-message" role="status">{message}</span><DataTable headers={['应用名称', '类型', 'Client ID', '版本', '状态', '操作']} empty="还没有应用">{resource.data.list.map((item) => <tr key={item.id}><td><Link className="table-link" to={`/developer/console/applications/${item.id}`}><strong>{item.draft.name}</strong></Link><small className="cell-note">{item.draft.description || '暂无描述'}</small></td><td>{item.type.toUpperCase()}</td><td><code>{item.clientId}</code></td><td>v{item.revision}</td><td><Status value={item.status} /></td><td><div className="row-actions">{(item.status === 'draft' || item.status === 'rejected') && <button type="button" onClick={() => void submit(item)}>提交审核</button>}</div></td></tr>)}</DataTable></section></>;
 }
 
 function ApplicationDraftForm({ title, submitLabel, initial, type = 'web', onCancel, onSubmit, message }: { title: string; submitLabel: string; initial?: ApplicationDraft; type?: ApplicationRecord['type']; onCancel: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>; message: string }) {
@@ -313,16 +328,18 @@ function AdminStatistics() {
 
 function Placeholder({ title }: { title: string }) { return <section className="placeholder-panel"><div className="placeholder-icon">◆</div><h2>{title}</h2><p>该模块正在接入统一控制台数据与操作流程。</p></section>; }
 
-function ConsoleContent({ kind, active, csrfToken, developerStatus }: { kind: ConsoleKind; active: string; csrfToken: string; developerStatus?: SessionData['developerStatus'] }) {
+function ConsoleContent({ kind, active, csrfToken, developerStatus, developerRevision, authenticationMethods = [] }: { kind: ConsoleKind; active: string; csrfToken: string; developerStatus?: SessionData['developerStatus']; developerRevision?: number; authenticationMethods?: Array<'email' | 'moondrop'> }) {
   const location = useLocation();
   const pathname = location.pathname.replace(/^\/developer\/console/, '/developer');
   if (pathname === '/account/profile') return <AccountProfilePage />;
   if (location.pathname === '/account/authorizations') return <AuthorizationsPage csrfToken={csrfToken} />;
   if (pathname === '/developer/overview') return <DeveloperOverview />;
   if (pathname === '/developer/profile') return <DeveloperProfilePage />;
+  if (pathname === '/developer/review') return <DeveloperReviewPage revision={developerRevision} status={developerStatus} />;
   if (pathname === '/developer/applications') return <ApplicationsPage canCreate={developerStatus === 'approved'} />;
   if (pathname.startsWith('/developer/applications/')) return <ApplicationDetailPage id={pathname.slice('/developer/applications/'.length)} />;
   if (pathname === '/developer/groups') return <GroupsPage canCreate={developerStatus === 'approved'} />;
+  if (pathname === '/developer/security') return <DeveloperSecurityPage methods={authenticationMethods.length ? authenticationMethods : undefined} />;
   if (location.pathname === '/admin/overview') return <AdminOverview />;
   if (location.pathname === '/admin/developers') return <AdminDevelopers csrfToken={csrfToken} />;
   if (location.pathname.startsWith('/admin/developers/')) return <AdminDeveloperDetail id={location.pathname.slice('/admin/developers/'.length)} csrfToken={csrfToken} />;
@@ -341,10 +358,12 @@ function ConsoleShell({ kind }: { kind: ConsoleKind }) {
   const session = useResource<SessionData>(async () => {
     if (kind !== 'developer') return apiGet<SessionData>('/api/v1/session');
     try {
-      const developer = await apiGet<{ account: { id: string; status: SessionData['developerStatus']; lastReview?: { reason: string | null; reviewedAt: string } | null } | null; csrfToken: string }>('/api/v1/developer-auth/session');
+      const developer = await apiGet<{ account: { id: string; status: SessionData['developerStatus']; revision: number; lastReview?: { reason: string | null; reviewedAt: string } | null } | null; authenticationMethods: Array<'email' | 'moondrop'>; csrfToken: string }>('/api/v1/developer-auth/session');
       if (developer.account) return {
         account: { uuid: developer.account.id, nickname: '开发者', email: null, picture: null },
         admin: { authenticated: false }, csrfToken: developer.csrfToken,
+        developerRevision: developer.account.revision,
+        authenticationMethods: developer.authenticationMethods,
         ...(developer.account.status ? { developerStatus: developer.account.status } : {}),
         ...(developer.account.lastReview ? { developerReview: developer.account.lastReview } : {}),
       };
@@ -365,5 +384,5 @@ function ConsoleShell({ kind }: { kind: ConsoleKind }) {
 }
 
 export function ConsoleApp() {
-  return <BrowserRouter><Routes><Route path="/" element={<DeveloperLanding />} /><Route path="/developer" element={<Navigate to="/" replace />} /><Route path="/developer/login" element={<DeveloperLogin />} /><Route path="/developer/register" element={<DeveloperRegister />} /><Route path="/developer/bind" element={<DeveloperBinding />} /><Route path="/developer/docs" element={<DeveloperDocs />} /><Route path="/developer/console/*" element={<ConsoleShell kind="developer" />} /><Route path="/developer/overview" element={<Navigate to="/developer/console/overview" replace />} /><Route path="/developer/profile" element={<Navigate to="/developer/console/profile" replace />} /><Route path="/developer/applications" element={<Navigate to="/developer/console/applications" replace />} /><Route path="/developer/groups" element={<Navigate to="/developer/console/groups" replace />} /><Route path="/admin" element={<Navigate to="/admin/overview" replace />} /><Route path="/admin/*" element={<ConsoleShell kind="admin" />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></BrowserRouter>;
+  return <BrowserRouter><Routes><Route path="/" element={<DeveloperLanding />} /><Route path="/developer" element={<Navigate to="/" replace />} /><Route path="/developer/login" element={<DeveloperLogin />} /><Route path="/developer/register" element={<DeveloperRegister />} /><Route path="/developer/bind" element={<DeveloperBinding />} /><Route path="/developer/docs" element={<DeveloperDocs />} /><Route path="/developer/console/*" element={<ConsoleShell kind="developer" />} /><Route path="/developer/overview" element={<Navigate to="/developer/console/overview" replace />} /><Route path="/developer/profile" element={<Navigate to="/developer/console/profile" replace />} /><Route path="/developer/review" element={<Navigate to="/developer/console/review" replace />} /><Route path="/developer/applications" element={<Navigate to="/developer/console/applications" replace />} /><Route path="/developer/groups" element={<Navigate to="/developer/console/groups" replace />} /><Route path="/developer/security" element={<Navigate to="/developer/console/security" replace />} /><Route path="/admin" element={<Navigate to="/admin/overview" replace />} /><Route path="/admin/*" element={<ConsoleShell kind="admin" />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></BrowserRouter>;
 }

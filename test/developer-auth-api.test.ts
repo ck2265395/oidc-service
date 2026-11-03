@@ -18,6 +18,7 @@ test('developer auth API creates an isolated developer cookie and returns its se
     auth: { async register() { return account; }, async loginWithPassword() { return { developerId: account.id, emailNormalized: 'dev@example.com', passwordDigest: {} as never, status: account.status }; } },
     codes: { async issue() { return 'sent' as const; } },
     sessions,
+    identities: { async listAuthenticationMethods(): Promise<Array<'email' | 'moondrop'>> { return ['email', 'moondrop']; } },
   });
   const app = express(); app.use('/api/v1/developer-auth', router);
   const server = createServer(app);
@@ -37,9 +38,11 @@ test('developer auth API creates an isolated developer cookie and returns its se
   assert.match(cookie, /SameSite=Lax/i);
 
   const session = await fetch(base + '/session', { headers: { cookie: `md-developer=${'t'.repeat(43)}` } });
-  const body = await session.json() as { data: { account: { id: string; status: string } | null; csrfToken: string } };
+  const body = await session.json() as { data: { account: { id: string; status: string } | null; authenticationMethods: string[]; csrfToken: string } };
   assert.equal(body.data.account?.id, 'dev-1');
   assert.equal(body.data.account?.status, 'unsubmitted');
+  assert.deepEqual(body.data.authenticationMethods, ['email', 'moondrop']);
+  assert.doesNotMatch(JSON.stringify(body), /dev@example\.com|passwordDigest|external.*subject/i);
   assert.match(body.data.csrfToken, /^[A-Za-z0-9_-]{43}$/);
 });
 
@@ -49,6 +52,7 @@ test('developer auth API rejects cross-origin credential mutations', async (cont
     auth: { async register() { throw new Error('not called'); }, async loginWithPassword() { throw new Error('not called'); } },
     codes: { async issue() { throw new Error('not called'); } },
     sessions: { async create() { return ''; }, async resolve() { return null; }, async revoke() {} },
+    identities: { async listAuthenticationMethods() { throw new Error('not called'); } },
   });
   const app = express(); app.use('/api/v1/developer-auth', router);
   const server = createServer(app);

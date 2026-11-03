@@ -199,6 +199,7 @@ export async function start(): Promise<void> {
       auth: developerAuthService,
       codes: developerCodes,
       sessions: developerSessions,
+      identities: developerStore,
     });
     const server = createServer(createApplication(config, provider, interactions, developer, admin, userPortal, readiness, recordProtocolEvent, userApi, sessionApi, accountApi, adminApi, developerAuth));
 

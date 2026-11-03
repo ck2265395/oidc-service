@@ -5,8 +5,8 @@ import { ConsoleApp } from './ConsoleApp';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-test('developer can edit qualification fields and submit the profile for review', async () => {
-  window.history.replaceState({}, '', '/developer/console/profile');
+test('developer can submit the completed profile from the review page', async () => {
+  window.history.replaceState({}, '', '/developer/console/review');
   const requests: Array<{ path: string; method: string; body?: string }> = [];
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const raw = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -48,7 +48,7 @@ test('administrator can see the developer review queue', async () => {
 });
 
 test('rejected developer sees the review reason and immutable history', async () => {
-  window.history.replaceState({}, '', '/developer/console/profile');
+  window.history.replaceState({}, '', '/developer/console/review');
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const raw = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     const path = new URL(raw, 'http://localhost').pathname;

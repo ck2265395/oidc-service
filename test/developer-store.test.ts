@@ -104,3 +104,30 @@ test('binds a verified MOONDROP subject to an existing developer without merging
   assert.match(calls[0]?.sql ?? '', /^INSERT INTO developer_external_identity/);
   assert.deepEqual(calls[0]?.values?.slice(1), ['11111111-1111-4111-8111-111111111111', 'moondrop', 'account-subject']);
 });
+
+test('lists only authentication methods backed by developer credentials', async () => {
+  const rows = [
+    { has_email: true, has_moondrop: false, expected: ['email'] },
+    { has_email: false, has_moondrop: true, expected: ['moondrop'] },
+    { has_email: true, has_moondrop: true, expected: ['email', 'moondrop'] },
+  ] as const;
+
+  for (const row of rows) {
+    const queries: Array<{ sql: string; values?: readonly unknown[] }> = [];
+    const pool = {
+      async query(sql: string, values?: readonly unknown[]) {
+        queries.push(values === undefined ? { sql } : { sql, values });
+        return { rows: [row], rowCount: 1 };
+      },
+    };
+    const store = new PostgresDeveloperStore(pool as never);
+
+    assert.deepEqual(
+      await store.listAuthenticationMethods('11111111-1111-4111-8111-111111111111'),
+      row.expected,
+    );
+    assert.match(queries[0]?.sql ?? '', /developer_password_credential/);
+    assert.match(queries[0]?.sql ?? '', /developer_external_identity/);
+    assert.deepEqual(queries[0]?.values, ['11111111-1111-4111-8111-111111111111']);
+  }
+});

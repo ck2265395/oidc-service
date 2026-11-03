@@ -219,6 +219,19 @@ export class PostgresDeveloperStore {
     );
   }
 
+  async listAuthenticationMethods(developerId: string): Promise<Array<'email' | 'moondrop'>> {
+    const result = await this.pool.query<{ has_email: boolean; has_moondrop: boolean }>(
+      "SELECT EXISTS (SELECT 1 FROM developer_password_credential WHERE developer_id = $1) AS has_email, EXISTS (SELECT 1 FROM developer_external_identity WHERE developer_id = $1 AND provider = 'moondrop') AS has_moondrop",
+      [developerId],
+    );
+    const row = result.rows[0];
+    if (!row) return [];
+    return [
+      ...(row.has_email ? ['email' as const] : []),
+      ...(row.has_moondrop ? ['moondrop' as const] : []),
+    ];
+  }
+
   async submitReview(developerId: string, expectedRevision: number): Promise<DeveloperAccount> {
     return this.changeReviewStatus(developerId, expectedRevision, 'submit', null, null);
   }

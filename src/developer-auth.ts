@@ -6,6 +6,7 @@ import { DeveloperAuthError, type DeveloperAuthService } from './developer-auth-
 import type { DeveloperEmailCode } from './developer-email-code.js';
 import type { DeveloperAccount } from './developer-identity.js';
 import type { DeveloperSessionService } from './developer-session.js';
+import type { PostgresDeveloperStore } from './developer-store.js';
 import { normalizeDeveloperEmail } from './developer-identity.js';
 import { randomToken } from './security.js';
 
@@ -15,6 +16,7 @@ interface AuthDependencies {
   auth: Pick<DeveloperAuthService, 'register' | 'loginWithPassword'>;
   codes: Pick<DeveloperEmailCode, 'issue'>;
   sessions: Pick<DeveloperSessionService, 'create' | 'resolve' | 'revoke'>;
+  identities: Pick<PostgresDeveloperStore, 'listAuthenticationMethods'>;
 }
 
 const SESSION_COOKIE = 'md-developer';
@@ -98,9 +100,10 @@ export function createDeveloperAuthRouter(dependencies: AuthDependencies): Route
   router.get('/session', async (request, response) => {
     const token = cookie(request, SESSION_COOKIE);
     const account = token ? await dependencies.sessions.resolve(token) : null;
+    const authenticationMethods = account ? await dependencies.identities.listAuthenticationMethods(account.id) : [];
     const csrfToken = randomToken();
     response.cookie(CSRF_COOKIE, csrfToken, { ...cookieOptions, sameSite: 'strict', maxAge: 30 * 60 * 1000 });
-    response.json({ code: 0, desc: 'ok', data: { account, csrfToken } });
+    response.json({ code: 0, desc: 'ok', data: { account, authenticationMethods, csrfToken } });
   });
 
   router.post('/logout', async (request, response) => {
