@@ -19,6 +19,70 @@ The developer contact-email verification workflow is enabled only when the prote
 
 Configure `host`, `port`, `secure`, and `from`; set `user` and `password` together when the relay requires authentication. Keep the password in the protected runtime configuration or secret manager. With `secure: false`, the transport requires STARTTLS and TLS 1.2 or newer. Verify relay reachability and sender authorization in the target environment before enabling the workflow. Verification messages contain a single-use link that expires after 30 minutes; a same-origin confirmation form consumes it, and requests are limited per account.
 
+Developer account registration also sends a six-digit code through the same SMTP relay. Codes are valid for 10 minutes and stored in Redis only as HMAC-derived keys. The HMAC uses the protected `secrets.fingerprint` value; it must be an independently generated high-entropy secret, must be identical on every service instance, and must never appear in logs or frontend configuration. Changing it invalidates outstanding registration codes but does not affect registered accounts.
+
+## Migration 003: developer identities
+
+Back up the OIDC PostgreSQL database before applying `003_developer_identity.sql`. Stop writes to developer profiles, application groups and applications during the migration window. The account database is read-only and is not modified.
+
+Record these values before migration:
+
+```sql
+SELECT count(*) AS developer_profiles FROM developer_profile;
+SELECT count(*) AS applications FROM oidc_application;
+SELECT count(*) AS application_groups FROM application_group;
+SELECT count(DISTINCT owner) AS legacy_owners
+FROM (
+  SELECT account_uuid AS owner FROM developer_profile
+  UNION SELECT owner_account_uuid FROM oidc_application
+  UNION SELECT owner_account_uuid FROM application_group
+) owners
+WHERE owner IS NOT NULL;
+```
+
+Build first, then run the checksum-protected migration runner exactly once per release. It uses a PostgreSQL advisory lock, executes each migration in a transaction and safely skips a migration whose recorded checksum is unchanged:
+
+```sh
+npm run build
+npm run migrate
+```
+
+After migration, verify that resource counts did not change and that every profile and owner maps to a developer account:
+
+```sql
+SELECT count(*) AS developer_profiles FROM developer_profile;
+SELECT count(*) AS applications FROM oidc_application;
+SELECT count(*) AS application_groups FROM application_group;
+
+SELECT count(*) AS profiles_without_developer
+FROM developer_profile p
+LEFT JOIN developer_account d ON d.id = p.developer_id
+WHERE p.developer_id IS NULL OR d.id IS NULL;
+
+SELECT count(*) AS applications_without_developer
+FROM oidc_application a
+LEFT JOIN developer_account d ON d.id::text = a.owner_account_uuid
+WHERE d.id IS NULL;
+
+SELECT count(*) AS groups_without_developer
+FROM application_group g
+LEFT JOIN developer_account d ON d.id::text = g.owner_account_uuid
+WHERE d.id IS NULL;
+
+SELECT count(*) AS moondrop_bindings_without_developer
+FROM developer_external_identity e
+LEFT JOIN developer_account d ON d.id = e.developer_id
+WHERE e.provider = 'moondrop' AND d.id IS NULL;
+
+SELECT count(DISTINCT subject) AS migrated_legacy_owners
+FROM developer_external_identity
+WHERE provider = 'moondrop';
+```
+
+All four unmapped counts must be zero, and `migrated_legacy_owners` must equal the preflight `legacy_owners` value. Preserve the preflight output with the release record so the comparison does not depend on rewritten owner columns. Run `npm run migrate` a second time and confirm it reports the database is up to date without changing the recorded counts. Migration 003 preserves legacy MOONDROP subjects in `developer_external_identity` and migrates existing owners as approved developers.
+
+There is no automatic down migration. Before the new service accepts developer registrations or ownership changes, rollback means restoring the pre-migration database backup and deploying the previous service version together. After new developer data has been written, do not attempt a partial schema rollback; restore in a controlled maintenance window or write and review a forward repair migration.
+
 
 ## Software inventory
 
@@ -45,7 +109,7 @@ The Compose PostgreSQL initialization runs `sql/postgre.sql` only when the data 
 - `GET /health/live` reports process liveness.
 - `GET /health/ready` checks PostgreSQL, the account database, and Redis.
 - Terminate with SIGTERM; the service closes HTTP, PostgreSQL, and Redis connections.
-- Run `npm run clean:expired` on a schedule from one maintenance job to remove expired OIDC documents, administrator sessions and login limits, plus audit records older than 90 days. The command touches only the OIDC database and deletes in batches of 5,000.
+- Run `npm run clean:expired` on a schedule from one maintenance job to remove expired OIDC documents, administrator sessions and login limits, developer sessions retained for seven days after their absolute or sliding expiry, developer sessions revoked for at least seven days, plus audit records older than 90 days. Redis registration-code and rate-limit keys expire through Redis TTL and are not scanned. The command touches only the OIDC database and deletes in batches of 5,000.
 - Back up PostgreSQL and Redis data volumes using the platform’s approved backup process. Signing keys and service secrets require separate encrypted backup and access controls.
 - Rotate signing keys with a planned JWKS overlap and client coordination. The current key loader accepts one active RS256 signing key; automated rotation is not implemented.
 

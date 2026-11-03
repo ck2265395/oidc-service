@@ -34,7 +34,7 @@ export class DeveloperEmailCode {
     if (!/^\d{6}$/.test(code)) throw new TypeError('Developer email code generator returned an invalid code');
     const key = this.codeKey(purpose, email, code);
     try {
-      await this.redis.set(key, JSON.stringify({ purpose, email }), { EX: 600 });
+      await this.redis.set(key, '1', { EX: 600 });
       await this.send(email, code);
       return 'sent';
     } catch (error) {
@@ -47,11 +47,6 @@ export class DeveloperEmailCode {
     if (!/^\d{6}$/.test(code)) return false;
     const raw = await this.redis.getDel(this.codeKey(purpose, email, code));
     if (!raw) return false;
-    try {
-      const value = JSON.parse(raw) as { purpose?: unknown; email?: unknown };
-      return value.purpose === purpose && value.email === email;
-    } catch {
-      return false;
-    }
+    return raw === '1';
   }
 }

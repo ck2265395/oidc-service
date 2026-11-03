@@ -24,7 +24,7 @@ test('email code stores only a keyed digest and can be consumed once', async () 
   await codes.issue('register', 'dev@example.com', '127.0.0.1');
 
   assert.deepEqual(sent, ['123456']);
-  assert.equal(writes.some((item) => item.key.includes('123456') || item.value.includes('123456')), false);
+  assert.equal(writes.some((item) => item.key.includes('123456') || item.value.includes('123456') || item.value.includes('dev@example.com') || item.value.includes('register')), false);
   assert.equal(await codes.consume('register', 'dev@example.com', '123456'), true);
   assert.equal(await codes.consume('register', 'dev@example.com', '123456'), false);
   assert.equal(await codes.consume('bind', 'dev@example.com', '123456'), false);
