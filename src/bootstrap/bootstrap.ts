@@ -1,10 +1,13 @@
 import type { AddressInfo } from 'node:net';
 
-import { type INestApplication, type LoggerService } from '@nestjs/common';
+import { type INestApplication, Logger, type LoggerService } from '@nestjs/common';
+import type { Express } from 'express';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 
 import { AppModule } from '../app.module.js';
+import { ApplicationExceptionFilter } from '../common/filters/application-exception.filter.js';
+import { configureHttpFoundation } from '../common/middleware/request-context.middleware.js';
 import { ConfigService } from '../infrastructure/config/config.service.js';
 
 export interface BootstrapOptions {
@@ -26,6 +29,11 @@ export async function bootstrapNest(options: BootstrapOptions = {}): Promise<Nes
     new ExpressAdapter(),
     { bodyParser: false, bufferLogs: true, logger: options.logger ?? ['log', 'error', 'warn'] },
   );
+  const requestLogger = options.logger && !Array.isArray(options.logger)
+    ? options.logger
+    : options.logger === false ? { log: () => undefined } : new Logger('HTTP');
+  configureHttpFoundation(app.getHttpAdapter().getInstance() as Express, config.get(), requestLogger);
+  app.useGlobalFilters(new ApplicationExceptionFilter());
   app.enableShutdownHooks();
   await app.listen(options.port ?? config.get().port, '127.0.0.1');
   const address = app.getHttpServer().address() as AddressInfo | null;
