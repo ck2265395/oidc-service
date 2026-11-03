@@ -38,20 +38,6 @@ function Brand({ compact = false }: { compact?: boolean }) {
   return <Link className="brand" to="/" aria-label="MOONDROP 首页"><img className="brand-mark" src="/assets/moondrop.ico" alt="MOONDROP" />{!compact && <span><strong>MOONDROP</strong><small>统一身份平台</small></span>}</Link>;
 }
 
-function PublicHome() {
-  return <div className="public-page">
-    <header className="public-header"><Brand /><nav className="public-nav" aria-label="主要导航"><a href="#capabilities">平台能力</a><Link to="/developer/docs">接入文档</Link><span className="service-state"><i />服务正常</span></nav></header>
-    <main>
-      <section className="hero-section">
-        <div className="hero-copy"><span className="kicker">MOONDROP IDENTITY PLATFORM</span><h1>一个账号，安全连接<br /><em>每一项数字服务</em></h1><p>基于 OpenID Connect 的统一身份平台，为用户、开发者与运营团队提供清晰可靠的认证与授权体验。</p><div className="hero-actions"><Link className="button primary" to="/account/profile">进入账号中心</Link><Link className="button secondary" to="/developer/overview">开发者接入</Link></div><div className="trust-row"><span>OIDC 标准协议</span><span>PKCE 安全登录</span><span>全链路审计</span></div></div>
-        <div className="identity-visual" aria-hidden="true"><div className="visual-grid" /><div className="visual-card main-card"><img className="visual-logo" src="/assets/moondrop.ico" alt="" /><strong>MOONDROP</strong><small>Secure access granted</small></div><div className="visual-card floating-card top-card">ID&nbsp;&nbsp;Verified</div><div className="visual-card floating-card bottom-card">✓&nbsp;&nbsp;OpenID Connect</div></div>
-      </section>
-      <section className="capabilities" id="capabilities"><div className="section-heading"><span>PLATFORM</span><h2>为不同角色准备的工作空间</h2><p>统一的安全底座，清晰分离的权限与流程。</p></div><div className="entry-grid"><Link className="entry-card" aria-label="账号中心" to="/account/profile"><span className="entry-icon blue">01</span><h3>账号中心</h3><p>维护个人资料，查看并管理已授权的应用。</p><b>进入账号中心 →</b></Link><Link className="entry-card" aria-label="开发者控制台" to="/developer/overview"><span className="entry-icon violet">02</span><h3>开发者控制台</h3><p>创建 OIDC 应用、管理回调地址并提交审核。</p><b>开始接入 →</b></Link><Link className="entry-card" aria-label="运营管理后台" to="/admin/overview"><span className="entry-icon green">03</span><h3>运营管理后台</h3><p>完成应用审核、风险审计与平台运行分析。</p><b>进入管理后台 →</b></Link></div></section>
-    </main>
-    <footer className="public-footer"><span>© 2026 MOONDROP</span><span>安全 · 开放 · 可审计</span></footer>
-  </div>;
-}
-
 function useResource<T>(load: () => Promise<T>, dependencies: unknown[] = []) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState('');
@@ -381,5 +367,5 @@ function ConsoleShell({ kind }: { kind: ConsoleKind }) {
 }
 
 export function ConsoleApp() {
-  return <BrowserRouter><Routes><Route path="/" element={<PublicHome />} /><Route path="/account" element={<Navigate to="/account/profile" replace />} /><Route path="/account/*" element={<ConsoleShell kind="account" />} /><Route path="/developer" element={<DeveloperLanding />} /><Route path="/developer/login" element={<DeveloperLogin />} /><Route path="/developer/register" element={<DeveloperRegister />} /><Route path="/developer/bind" element={<DeveloperBinding />} /><Route path="/developer/docs" element={<DocsPage />} /><Route path="/developer/console/*" element={<ConsoleShell kind="developer" />} /><Route path="/developer/*" element={<ConsoleShell kind="developer" />} /><Route path="/admin" element={<Navigate to="/admin/overview" replace />} /><Route path="/admin/*" element={<ConsoleShell kind="admin" />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></BrowserRouter>;
+  return <BrowserRouter><Routes><Route path="/" element={<DeveloperLanding />} /><Route path="/developer" element={<Navigate to="/" replace />} /><Route path="/developer/login" element={<DeveloperLogin />} /><Route path="/developer/register" element={<DeveloperRegister />} /><Route path="/developer/bind" element={<DeveloperBinding />} /><Route path="/developer/docs" element={<DocsPage />} /><Route path="/developer/console/*" element={<ConsoleShell kind="developer" />} /><Route path="/developer/overview" element={<Navigate to="/developer/console/overview" replace />} /><Route path="/developer/profile" element={<Navigate to="/developer/console/profile" replace />} /><Route path="/developer/applications" element={<Navigate to="/developer/console/applications" replace />} /><Route path="/developer/groups" element={<Navigate to="/developer/console/groups" replace />} /><Route path="/admin" element={<Navigate to="/admin/overview" replace />} /><Route path="/admin/*" element={<ConsoleShell kind="admin" />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></BrowserRouter>;
 }

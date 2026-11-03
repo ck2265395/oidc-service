@@ -3,16 +3,27 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import { ConsoleApp } from './ConsoleApp';
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-test('unauthenticated developer landing shows portal content without console navigation', () => {
-  window.history.replaceState({}, '', '/developer');
+test('public portal exposes only developer actions', () => {
+  window.history.replaceState({}, '', '/');
   render(<ConsoleApp />);
 
   expect(screen.getByRole('heading', { name: '连接用户与应用，从一个可信身份开始' })).toBeInTheDocument();
   expect(screen.getAllByRole('link', { name: '注册开发者' })[0]).toHaveAttribute('href', '/developer/register');
   expect(screen.getByRole('link', { name: '登录控制台' })).toHaveAttribute('href', '/developer/login');
+  expect(screen.getAllByRole('link', { name: /接入文档/ })[0]).toHaveAttribute('href', '/developer/docs');
+  expect(screen.queryByRole('link', { name: '账号中心' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: '运营管理后台' })).not.toBeInTheDocument();
   expect(screen.queryByRole('navigation', { name: '开发者控制台' })).not.toBeInTheDocument();
+});
+
+test('developer landing alias returns to the public portal', () => {
+  window.history.replaceState({}, '', '/developer');
+  render(<ConsoleApp />);
+
+  expect(screen.getByRole('heading', { name: '连接用户与应用，从一个可信身份开始' })).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/');
 });
 
 test('developer login offers email password and MOONDROP identity', () => {

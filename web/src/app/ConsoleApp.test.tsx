@@ -3,22 +3,21 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import { ConsoleApp } from './ConsoleApp';
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-test('renders the public identity navigation and role entry points', () => {
-  window.history.replaceState({}, '', '/');
+test('removed account routes return to the developer portal', () => {
+  window.history.replaceState({}, '', '/account/profile');
+  const fetch = vi.fn();
+  vi.stubGlobal('fetch', fetch);
   render(<ConsoleApp />);
 
-  const brand = screen.getByRole('link', { name: 'MOONDROP 首页' });
-  expect(brand).toBeInTheDocument();
-  expect(screen.getByRole('img', { name: 'MOONDROP' })).toHaveAttribute('src', '/assets/moondrop.ico');
-  expect(screen.getByRole('link', { name: '账号中心' })).toHaveAttribute('href', '/account/profile');
-  expect(screen.getByRole('link', { name: '开发者控制台' })).toHaveAttribute('href', '/developer/overview');
-  expect(screen.getByRole('link', { name: '运营管理后台' })).toHaveAttribute('href', '/admin/overview');
+  expect(screen.getByRole('heading', { name: '连接用户与应用，从一个可信身份开始' })).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/');
+  expect(fetch).not.toHaveBeenCalled();
 });
 
 test('shows live developer overview data for the signed-in account', async () => {
-  window.history.replaceState({}, '', '/developer/overview');
+  window.history.replaceState({}, '', '/developer/console/overview');
   const responses: Record<string, unknown> = {
     '/api/v1/session': {
       account: { uuid: 'account-1', nickname: 'Moon Dev', email: 'm***@example.com', picture: null },

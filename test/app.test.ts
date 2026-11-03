@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { createServer } from 'node:http';
 
@@ -62,6 +63,12 @@ test('unknown routes do not reveal internal error details', async (context) => {
   assert.equal(response.status, 404);
   assert.deepEqual(Object.keys(body).sort(), ['error', 'requestId']);
   assert.equal(body.error, 'not_found');
+});
+
+test('public sources contain no administrator entry', async () => {
+  const source = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(source, /\/admin|运营管理|OPERATIONS/);
 });
 
 test('console routes serve the frontend shell without shadowing API routes', async (context) => {
