@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 test('repository documents an ignored local config and a tracked safe template', async () => {
-  const [environmentExample, gitignore, configExample, deployment, packageJson] = await Promise.all([
+  const [environmentExample, gitignore, configExample, deployment, packageJson, compose] = await Promise.all([
     readFile('.env.example', 'utf8'),
     readFile('.gitignore', 'utf8'),
     readFile('runtime/config.example.json', 'utf8'),
     readFile('docs/deploy.md', 'utf8'),
     readFile('package.json', 'utf8'),
+    readFile('compose.yaml', 'utf8'),
   ]);
 
   assert.match(environmentExample, /OIDC_CONFIG_FILE=.\/runtime\/config\.local\.json/);
@@ -21,4 +22,7 @@ test('repository documents an ignored local config and a tracked safe template',
   assert.match(deployment, /test and production/i);
   const scripts = (JSON.parse(packageJson) as { scripts: Record<string, string> }).scripts;
   assert.match(scripts['migrate:local'] ?? '', /--env-file=\.env\.local/);
+  assert.match(compose, /\.\/runtime\/config\.local\.json:\/run\/identity\/config\.json:ro/);
+  assert.match(compose, /\.\/runtime\/signing\.local\.json:\/run\/identity\/signing\.json:ro/);
+  await assert.rejects(access('config.example.json'), { code: 'ENOENT' });
 });

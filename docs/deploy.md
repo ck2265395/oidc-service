@@ -103,9 +103,9 @@ Run `npm run sbom` after installing dependencies to generate `sbom.cdx.json` in 
 
 ## Container deployment
 
-1. Copy `runtime/config.example.json` to a protected deployment path such as `/run/secrets/oidc/config.json`, set `port` to `3000`, and replace every placeholder with actual protected values. Set the OIDC database URL to `oidc-db` and Redis URL to `redis` for the Compose network. Configure the account database URL using a host reachable from the container.
+1. For the repository's local Compose stack, copy `runtime/config.example.json` to the ignored `runtime/config.local.json`, set `port` to `3000`, and replace every placeholder with local protected values. Set the OIDC database URL to `oidc-db` and Redis URL to `redis` for the Compose network. Configure the account database URL using a host reachable from the container.
 2. Set `mode` to `production`, configure the public HTTPS `issuer`, and list only actual reverse-proxy CIDRs in `trustedProxyCidrs`.
-3. Generate signing material outside the repository with `npm run keys -- --out /run/secrets/oidc/signing.json`; provide the other generated keys in the protected configuration. Create an administrator password hash with `npm run admin:password`, and set `OIDC_CONFIG_FILE` and `OIDC_SIGNING_KEY_FILE` to the two mounted paths.
+3. Generate signing material with `npm run keys -- --out runtime/signing.local.json`; provide the other generated keys in the protected configuration and create an administrator password hash with `npm run admin:password`. Compose mounts these two ignored local files at `/run/identity/config.json` and `/run/identity/signing.json`. Test and production deployments must replace these bind mounts with their secret-manager or platform-specific protected mounts.
 4. Set `OIDC_DB_PASSWORD` to the same strong password configured in the OIDC database URL and Compose environment. Keep `runtime/` out of version control.
 5. Start PostgreSQL and Redis, then build and start the service:
 

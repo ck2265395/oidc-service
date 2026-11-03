@@ -38,8 +38,8 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./runtime/config.json:/run/identity/config.json:ro
-      - ./runtime/signing.json:/run/identity/signing.json:ro
+      - ./runtime/config.local.json:/run/identity/config.json:ro
+      - ./runtime/signing.local.json:/run/identity/signing.json:ro
     depends_on:
       oidc-db:
         condition: service_healthy
