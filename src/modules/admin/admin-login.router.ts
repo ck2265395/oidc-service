@@ -41,6 +41,7 @@ function requestOriginAllowed(request: Request, issuer: string): boolean {
 export function createAdminLoginRouter(pool: Pool, config: ServiceConfig): Router {
   const router = Router();
   router.use(express.urlencoded({ extended: false, limit: '16kb', parameterLimit: 20 }));
+  router.use(express.json({ limit: '16kb' }));
   const secure = config.issuer.startsWith('https:');
   const cookieName = secure ? '__Host-dt-admin' : 'dt-admin';
   const csrfCookieName = secure ? '__Host-dt-admin-csrf' : 'dt-admin-csrf';

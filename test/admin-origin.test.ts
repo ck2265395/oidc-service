@@ -64,12 +64,12 @@ test('accepts an opaque Origin only for a browser-declared same-origin form', as
   const success = await fetch(baseUrl + '/admin/login', {
     method: 'POST', redirect: 'manual',
     headers: {
-      'content-type': 'application/x-www-form-urlencoded',
+      'content-type': 'application/json',
       cookie,
       origin: 'null',
       'sec-fetch-site': 'same-origin',
     },
-    body: new URLSearchParams({ csrf, username: 'admin', password: 'correct-password' }),
+    body: JSON.stringify({ csrf, username: 'admin', password: 'correct-password' }),
   });
   const sessionCookie = success.headers.get('set-cookie') ?? '';
   assert.equal(success.status, 303);
