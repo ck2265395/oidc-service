@@ -35,6 +35,7 @@ export class DeveloperAuthModule {
     const AUTH = Symbol('DEVELOPER_AUTH'); const CODES = Symbol('DEVELOPER_CODES');
     return {
       module: DeveloperAuthModule,
+      global: true,
       controllers: [DeveloperAuthController],
       providers: [
         { provide: DEVELOPER_STORE, inject: [OIDC_POOL], useFactory: (pool: Pool) => new PostgresDeveloperStore(pool) },
