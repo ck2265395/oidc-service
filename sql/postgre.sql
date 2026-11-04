@@ -121,11 +121,15 @@ CREATE TABLE IF NOT EXISTS platform_admin (
   username text NOT NULL CHECK (char_length(username) BETWEEN 1 AND 128),
   username_normalized text NOT NULL UNIQUE CHECK (username_normalized = lower(btrim(username_normalized))),
   password_hash text NOT NULL,
+  role text NOT NULL DEFAULT 'super_admin' CHECK (role IN ('super_admin', 'operator', 'auditor')),
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
   must_change_password boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS platform_admin_role_status_idx
+  ON platform_admin (role, status);
 
 CREATE TABLE IF NOT EXISTS admin_session (
   session_hash text PRIMARY KEY CHECK (session_hash ~ '^[a-f0-9]{64}$'),
