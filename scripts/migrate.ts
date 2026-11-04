@@ -1,9 +1,9 @@
-import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { createPlatformPool } from '../src/modules/application/infrastructure/application.store.js';
 import { loadConfig } from '../src/infrastructure/config/config.schema.js';
+import { migrationChecksums } from './migration-checksum.js';
 
 const MIGRATION_LOCK_CLASS = 1_280_263_506;
 const MIGRATION_LOCK_ID = 1;
@@ -30,13 +30,13 @@ async function migrate(): Promise<void> {
 
     for (const name of names) {
       const source = await readFile(resolve(directory, name), 'utf8');
-      const checksum = createHash('sha256').update(source).digest('hex');
+      const checksums = migrationChecksums(source);
       const existing = await connection.query<{ checksum: string }>(
         'SELECT checksum FROM schema_migration WHERE version = $1',
         [name],
       );
       if (existing.rows[0]) {
-        if (existing.rows[0].checksum !== checksum) {
+        if (!checksums.accepted.has(existing.rows[0].checksum)) {
           throw new Error('An applied schema migration has changed');
         }
         continue;
@@ -47,7 +47,7 @@ async function migrate(): Promise<void> {
         await connection.query(source);
         await connection.query(
           'INSERT INTO schema_migration (version, checksum) VALUES ($1, $2)',
-          [name, checksum],
+          [name, checksums.canonical],
         );
         await connection.query('COMMIT');
       } catch (error) {
