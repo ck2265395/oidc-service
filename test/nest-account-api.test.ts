@@ -59,12 +59,12 @@ test('Nest account API preserves anonymous profile and session contracts', async
 });
 
 test('Nest account API exposes administrator bootstrap without session identifiers', async (context) => {
-  const target = await service({ adminAuth: { async authenticated() { return { id: 'admin-id', username: 'ops', mustChangePassword: false }; } } }); context.after(target.close);
+  const target = await service({ adminAuth: { async authenticated() { return { id: 'admin-id', username: 'ops', role: 'operator' as const, mustChangePassword: false }; } } }); context.after(target.close);
   const response = await fetch(target.base + '/api/v1/session');
   assert.equal(response.status, 200);
   const body = await response.json() as { data: { admin: unknown } };
-  assert.deepEqual(body.data.admin, { authenticated: true, username: 'ops', mustChangePassword: false });
-  assert.deepEqual(Object.keys(body.data.admin as object).sort(), ['authenticated', 'mustChangePassword', 'username']);
+  assert.deepEqual(body.data.admin, { authenticated: true, username: 'ops', role: 'operator', mustChangePassword: false });
+  assert.deepEqual(Object.keys(body.data.admin as object).sort(), ['authenticated', 'mustChangePassword', 'role', 'username']);
 });
 
 test('Nest account API enforces authorization ownership and CSRF before revocation', async (context) => {

@@ -31,7 +31,7 @@ test('accepts an opaque Origin only for a browser-declared same-origin form', as
     profilePictureBaseUrl: null,
   } satisfies ServiceConfig;
   const passwordHash = hashAdminPassword('correct-password');
-  const authentication = new AdminAuthenticationService({ async findCredential(username) { return username === 'admin' ? { principal: { id: 'admin-id', username: 'admin', mustChangePassword: false }, passwordHash, status: 'active' } : null; } });
+  const authentication = new AdminAuthenticationService({ async findCredential(username) { return username === 'admin' ? { principal: { id: 'admin-id', username: 'admin', role: 'super_admin', mustChangePassword: false }, passwordHash, status: 'active' } : null; } });
   const sessions: Array<[string, string]> = [];
   const repository = { async createSession(adminId: string, sessionHash: string) { sessions.push([adminId, sessionHash]); } };
   const app = express();

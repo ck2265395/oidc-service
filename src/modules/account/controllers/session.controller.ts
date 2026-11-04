@@ -24,7 +24,7 @@ export class SessionController {
     const administrator = await this.adminAuth.authenticated(request).catch(() => null);
     const secure = this.accounts.settings.issuer.startsWith('https:');
     response.json({ code: 0, desc: 'ok', data: {
-      account, admin: administrator ? { authenticated: true, username: administrator.username, mustChangePassword: administrator.mustChangePassword } : { authenticated: false },
+      account, admin: administrator ? { authenticated: true, username: administrator.username, role: administrator.role, mustChangePassword: administrator.mustChangePassword } : { authenticated: false },
       csrfToken: setConsoleCsrf(response, secure),
     } });
   }

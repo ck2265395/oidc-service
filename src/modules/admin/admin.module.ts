@@ -20,16 +20,19 @@ import { PostgresAdminAudit, type AdminAuditPort } from './infrastructure/admin-
 import { PostgresAdminRepository } from './infrastructure/admin.repository.js';
 import { AdminAuthenticationService } from './application/admin-authentication.service.js';
 import { AdminBootstrapService } from './application/admin-bootstrap.service.js';
+import { AdminManagementService } from './application/admin-management.service.js';
+import { AdminRoleGuard } from './admin-role.guard.js';
 
-export interface AdminModuleOptions { config: ServiceConfig; auth: AdminAuthPort; applications: ApplicationService; groups: ApplicationGroupService; developers: Pick<PostgresDeveloperStore, 'listForAdmin'|'getForAdmin'|'reviewDeveloper'>; audit: AdminAuditPort; }
+export interface AdminModuleOptions { config: ServiceConfig; auth: AdminAuthPort; applications: ApplicationService; groups: ApplicationGroupService; developers: Pick<PostgresDeveloperStore, 'listForAdmin'|'getForAdmin'|'reviewDeveloper'>; audit: AdminAuditPort; management: AdminManagementService; }
 
 @Module({})
 export class AdminModule {
-  static register(options: AdminModuleOptions): DynamicModule { return { module: AdminModule, controllers: [AdminController], providers: [AdminAuthGuard, { provide: AdminService, useValue: new AdminService(options.config, options.auth, options.applications, options.groups, options.developers, options.audit) }] }; }
-  static registerProduction(applicationModule: DynamicModule, developerModule: DynamicModule): DynamicModule { return { module: AdminModule, imports: [applicationModule, developerModule], controllers: [AdminController, AdminPageController], providers: [AdminAuthGuard,
+  static register(options: AdminModuleOptions): DynamicModule { return { module: AdminModule, controllers: [AdminController], providers: [AdminAuthGuard, AdminRoleGuard, { provide: AdminService, useValue: new AdminService(options.config, options.auth, options.applications, options.groups, options.developers, options.audit, options.management) }] }; }
+  static registerProduction(applicationModule: DynamicModule, developerModule: DynamicModule): DynamicModule { return { module: AdminModule, imports: [applicationModule, developerModule], controllers: [AdminController, AdminPageController], providers: [AdminAuthGuard, AdminRoleGuard,
     { provide: PostgresAdminRepository, inject: [OIDC_POOL], useFactory: (pool: Pool) => new PostgresAdminRepository(pool) },
     { provide: AdminAuthenticationService, inject: [PostgresAdminRepository], useFactory: (repository: PostgresAdminRepository) => new AdminAuthenticationService(repository) },
     { provide: AdminBootstrapService, inject: [ConfigService, PostgresAdminRepository], useFactory: (config: ConfigService, repository: PostgresAdminRepository) => new AdminBootstrapService(config.get().mode, repository) },
     { provide: ADMIN_PAGE_ROUTER, inject: [OIDC_POOL, ConfigService, AdminAuthenticationService, PostgresAdminRepository], useFactory: (pool: Pool, config: ConfigService, authentication: AdminAuthenticationService, repository: PostgresAdminRepository) => createAdminLoginRouter(pool, config.get(), authentication, repository) },
-    { provide: AdminService, inject: [ConfigService, OIDC_POOL, PostgresAdminRepository, Applications, Groups, DEVELOPER_STORE], useFactory: (config: ConfigService, pool: Pool, repository: PostgresAdminRepository, applications: ApplicationService, groups: ApplicationGroupService, developers: PostgresDeveloperStore) => new AdminService(config.get(), new PostgresAdminAuth(repository, config.get()), applications, groups, developers, new PostgresAdminAudit(pool)) }] }; }
+    { provide: AdminManagementService, inject: [PostgresAdminRepository], useFactory: (repository: PostgresAdminRepository) => new AdminManagementService(repository) },
+    { provide: AdminService, inject: [ConfigService, OIDC_POOL, PostgresAdminRepository, Applications, Groups, DEVELOPER_STORE, AdminManagementService], useFactory: (config: ConfigService, pool: Pool, repository: PostgresAdminRepository, applications: ApplicationService, groups: ApplicationGroupService, developers: PostgresDeveloperStore, management: AdminManagementService) => new AdminService(config.get(), new PostgresAdminAuth(repository, config.get()), applications, groups, developers, new PostgresAdminAudit(pool), management) }] }; }
 }

@@ -25,10 +25,15 @@ async function service(applicationOverrides: Partial<ApplicationModuleOptions> =
   const application: ApplicationModuleOptions = { config, developer, applications: apps as never, groups: groups as never, ...applicationOverrides };
   const admin: AdminModuleOptions = {
     config,
-    auth: { async authenticated(request) { return request.headers['x-admin-test'] === 'yes' ? { id: 'admin-id', username: 'ops', mustChangePassword: false } : null; }, mutationAllowed() { return true; }, async logout() {} },
+    auth: { async authenticated(request) { return request.headers['x-admin-test'] === 'yes' ? { id: 'admin-id', username: 'ops', role: (request.headers['x-admin-role'] || 'super_admin') as 'super_admin'|'operator'|'auditor', mustChangePassword: request.headers['x-admin-password-change'] === 'yes' } : null; }, mutationAllowed() { return true; }, async logout() {} },
     applications: application.applications, groups: application.groups,
     developers: { async listForAdmin() { return { total: 0, list: [] }; }, async getForAdmin() { return null; }, async reviewDeveloper() { throw new Error('unused'); } } as never,
     audit: { async list(page) { return { page, list: [{ action: 'application.review' }] }; }, async statistics(days) { return { days, list: [] }; }, async overview() { return { applications: {}, groups: {}, recentAudit: [] }; }, async recordDeveloperReview() {} },
+    management: {
+      async list() { return { total: 1, list: [{ id: 'admin-id', username: 'ops', role: 'super_admin', status: 'active', mustChangePassword: false }] }; },
+      async create() { return { administrator: { id: 'admin-2', username: 'audit', role: 'auditor', status: 'active', mustChangePassword: true }, temporaryPassword: 'temporary-password-123' }; },
+      async setStatus() { throw new Error('unused'); }, async setRole() { throw new Error('unused'); }, async resetPassword() { throw new Error('unused'); }, async changeOwnPassword() {},
+    } as never,
     ...adminOverrides,
   };
   @Module({ imports: [ApplicationModule.register(application), AdminModule.register(admin)] }) class TestModule {}
@@ -78,4 +83,33 @@ test('Nest admin developer review validates pagination, reasons, and optimistic 
   assert.equal(missingReason.status, 400);
   const conflict = await fetch(target.base + '/api/v1/admin/developers/dev-1/review', { method: 'POST', headers, body: JSON.stringify({ action: 'reject', expectedRevision: 1, reason: 'incomplete' }) });
   assert.equal(conflict.status, 409);
+});
+
+test('administrator management is restricted to super administrators', async (context) => {
+  const target = await service(); context.after(target.close);
+  const operator = await fetch(target.base + '/api/v1/admin/administrators', { headers: { 'x-admin-test': 'yes', 'x-admin-role': 'operator' } });
+  assert.equal(operator.status, 403);
+  assert.equal((await operator.json() as { code: string }).code, 'insufficient_role');
+  const allowed = await fetch(target.base + '/api/v1/admin/administrators', { headers: { 'x-admin-test': 'yes' } });
+  assert.equal(allowed.status, 200);
+  assert.equal((await allowed.json() as { data: { total: number } }).data.total, 1);
+});
+
+test('administrator create returns a temporary password once', async (context) => {
+  const target = await service(); context.after(target.close);
+  const response = await fetch(target.base + '/api/v1/admin/administrators', { method: 'POST', headers: { ...writeHeaders, 'x-admin-test': 'yes' }, body: JSON.stringify({ username: 'audit', role: 'auditor' }) });
+  assert.equal(response.status, 201);
+  const body = await response.json() as { data: { temporaryPassword: string; administrator: { role: string } } };
+  assert.equal(body.data.temporaryPassword, 'temporary-password-123');
+  assert.equal(body.data.administrator.role, 'auditor');
+});
+
+test('administrator forced password change blocks ordinary endpoints but permits password replacement', async (context) => {
+  const target = await service(); context.after(target.close);
+  const headers = { ...writeHeaders, 'x-admin-test': 'yes', 'x-admin-password-change': 'yes' };
+  const blocked = await fetch(target.base + '/api/v1/admin/overview', { headers });
+  assert.equal(blocked.status, 403);
+  assert.equal((await blocked.json() as { code: string }).code, 'password_change_required');
+  const changed = await fetch(target.base + '/api/v1/admin/password', { method: 'POST', headers, body: JSON.stringify({ currentPassword: 'temporary-password-123', nextPassword: 'replacement-password-123' }) });
+  assert.equal(changed.status, 200);
 });

@@ -8,18 +8,18 @@ test('administrator authentication returns only an active database principal', a
   const passwordHash = hashAdminPassword('123456');
   const repository = {
     async findCredential(username: string) {
-      return username === 'admin' ? { principal: { id: 'id-1', username: 'admin', mustChangePassword: true }, passwordHash, status: 'active' as const } : null;
+      return username === 'admin' ? { principal: { id: 'id-1', username: 'admin', role: 'super_admin' as const, mustChangePassword: true }, passwordHash, status: 'active' as const } : null;
     },
   };
   const service = new AdminAuthenticationService(repository);
-  assert.deepEqual(await service.login('admin', '123456'), { id: 'id-1', username: 'admin', mustChangePassword: true });
+  assert.deepEqual(await service.login('admin', '123456'), { id: 'id-1', username: 'admin', role: 'super_admin', mustChangePassword: true });
   assert.equal(await service.login('admin', 'wrong'), null);
   assert.equal(await service.login('missing', '123456'), null);
 });
 
 test('disabled administrator credentials always fail', async () => {
   const passwordHash = hashAdminPassword('123456');
-  const service = new AdminAuthenticationService({ async findCredential() { return { principal: { id: 'id-1', username: 'admin', mustChangePassword: false }, passwordHash, status: 'disabled' as const }; } });
+  const service = new AdminAuthenticationService({ async findCredential() { return { principal: { id: 'id-1', username: 'admin', role: 'auditor' as const, mustChangePassword: false }, passwordHash, status: 'disabled' as const }; } });
   assert.equal(await service.login('admin', '123456'), null);
 });
 
