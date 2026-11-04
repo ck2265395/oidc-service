@@ -106,6 +106,9 @@ td code { font-size: 10px; color: #58667e; background: #f5f7fa; border-radius: 4
 .developer-docs-content { display: flex; flex-direction: column; gap: 18px; }.developer-docs-content > section { scroll-margin-top: 24px; padding: 30px; background: #fff; border: 1px solid #e4e9f1; border-radius: 14px; }
 .developer-docs-content h2 { margin: 8px 0 14px; font-size: 24px; }.developer-docs-content p { color: #68758b; line-height: 1.8; }.developer-docs-content a { color: #3157d5; }
 .developer-docs-content pre { padding: 16px; overflow: auto; border-radius: 9px; background: #101a31; color: #d8e3ff; }
+.developer-docs-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+.developer-docs-actions .button { margin: 0; }
+.developer-docs-actions [role="status"] { color: #66738a; font-size: 12px; }
 .developer-docs-steps { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }.developer-docs-steps li { display: flex; gap: 12px; padding: 16px; border: 1px solid #e7ebf2; border-radius: 10px; }.developer-docs-steps b { color: #3157d5; }.developer-docs-steps strong { font-size: 13px; }.developer-docs-steps p { margin: 6px 0 0; font-size: 12px; }
 .developer-docs-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }.developer-docs-cards > div { padding: 18px; border-radius: 10px; background: #f6f8fc; }.developer-docs-cards h3 { margin: 0 0 8px; font-size: 15px; }.developer-docs-cards p { margin: 0; font-size: 12px; }
 .developer-docs-content details { padding: 14px 0; border-top: 1px solid #e7ebf2; }.developer-docs-content summary { cursor: pointer; font-weight: 700; }.developer-docs-content details p { margin-bottom: 0; }
