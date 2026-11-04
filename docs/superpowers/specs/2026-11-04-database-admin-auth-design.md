@@ -20,6 +20,8 @@ Move administrator credentials from protected JSON configuration into PostgreSQL
 - No password reset or password-change page yet. `must_change_password` is persisted for the next administrator-account feature but does not block local use.
 - No default administrator is created in test or production modes.
 
+Production administrators are provisioned explicitly through a protected CLI command that prompts for the username and password and writes only the password hash to PostgreSQL.
+
 ## Approaches considered
 
 1. Database table with local-only startup seed — selected because it combines local convenience with production safety.
