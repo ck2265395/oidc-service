@@ -13,7 +13,6 @@ const secret = (): string => randomBytes(32).toString('base64url');
 const input = () => ({
   mode: 'test', issuer: 'http://127.0.0.1:3000', port: 3000,
   secrets: { legacyHmacKey: secret(), cookie: secret(), fingerprint: secret(), subject: secret(), encryption: secret() },
-  admin: { username: 'ops', passwordHash: 'scrypt$16384$8$1$salt$hash' },
   databases: { oidc: 'postgres://oidc:secret@localhost:5432/oidc_test', accounts: 'postgres://reader:secret@localhost:5432/accounts_test' },
   redisUrl: 'redis://localhost:6379/0',
 });

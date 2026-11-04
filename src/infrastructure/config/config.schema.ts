@@ -13,10 +13,6 @@ export interface ServiceConfig {
     subject: string;
     encryption: string;
   };
-  admin: {
-    username: string;
-    passwordHash: string;
-  };
   databases: {
     oidc: string;
     accounts: string;
@@ -216,7 +212,9 @@ export function loadConfig(input: unknown): ServiceConfig {
   }
 
   const secretsInput = objectAt(root.secrets, 'secrets');
-  const admin = objectAt(root.admin, 'admin');
+  if (root.admin !== undefined) {
+    throw new ConfigError('admin credentials must be stored in the database');
+  }
   const databases = objectAt(root.databases, 'databases');
   const secrets = {
     legacyHmacKey: legacyKeyAt(secretsInput.legacyHmacKey, 'secrets.legacyHmacKey'),
@@ -230,22 +228,11 @@ export function loadConfig(input: unknown): ServiceConfig {
     throw new ConfigError('secrets must be independent');
   }
 
-  const username = stringAt(admin.username, 'admin.username');
-  if (username.length > 128) {
-    throw new ConfigError('admin.username is too long');
-  }
-
-  const passwordHash = stringAt(admin.passwordHash, 'admin.passwordHash');
-  if (!/^scrypt\$\d+\$\d+\$\d+\$[^$]+\$[^$]+$/.test(passwordHash)) {
-    throw new ConfigError('admin.passwordHash must be a precomputed scrypt hash');
-  }
-
   return {
     mode,
     issuer: issuer.replace(/\/$/, ''),
     port: Number(root.port),
     secrets,
-    admin: { username, passwordHash },
     databases: {
       oidc: databaseUrlAt(databases.oidc, 'databases.oidc'),
       accounts: databaseUrlAt(databases.accounts, 'databases.accounts'),

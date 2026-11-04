@@ -1,5 +1,3 @@
-BEGIN;
-
 CREATE TABLE IF NOT EXISTS platform_admin (
   id uuid PRIMARY KEY,
   username text NOT NULL CHECK (char_length(username) BETWEEN 1 AND 128),
@@ -13,5 +11,3 @@ CREATE TABLE IF NOT EXISTS platform_admin (
 
 ALTER TABLE admin_session ADD COLUMN IF NOT EXISTS admin_id uuid REFERENCES platform_admin(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS admin_session_admin_idx ON admin_session (admin_id, last_activity DESC);
-
-COMMIT;

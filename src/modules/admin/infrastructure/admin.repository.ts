@@ -30,6 +30,14 @@ export class PostgresAdminRepository {
     return result.rowCount === 1;
   }
 
+  async createAdministrator(id: string, username: string, passwordHash: string): Promise<void> {
+    const displayName = username.trim();
+    await this.pool.query(
+      "INSERT INTO platform_admin (id, username, username_normalized, password_hash, status, must_change_password) VALUES ($1, $2, $3, $4, 'active', false)",
+      [id, displayName, displayName.toLowerCase(), passwordHash],
+    );
+  }
+
   async createSession(adminId: string, sessionHash: string): Promise<void> {
     await this.pool.query('INSERT INTO admin_session (admin_id, session_hash) VALUES ($1, $2)', [adminId, sessionHash]);
   }

@@ -16,7 +16,6 @@ export function testServiceConfig(): ServiceConfig {
       subject: secret(),
       encryption: secret(),
     },
-    admin: { username: 'ops', passwordHash: 'scrypt$16384$8$1$salt$hash' },
     databases: {
       oidc: 'postgres://oidc:secret@localhost:5432/oidc_test',
       accounts: 'postgres://reader:secret@localhost:5432/accounts_test',

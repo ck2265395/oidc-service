@@ -20,7 +20,6 @@ test('accepts an opaque Origin only for a browser-declared same-origin form', as
     issuer: 'http://127.0.0.1:3000',
     port: 3000,
     secrets: { legacyHmacKey: 'legacy-key&&', cookie: 'c'.repeat(43), fingerprint: 'f'.repeat(43), subject: 's'.repeat(43), encryption: 'e'.repeat(43) },
-    admin: { username: 'legacy-config-user', passwordHash: hashAdminPassword('legacy-password') },
     databases: { oidc: '', accounts: '' },
     redisUrl: 'redis://127.0.0.1:6379/0',
     redisUsername: null,

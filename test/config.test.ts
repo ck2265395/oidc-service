@@ -17,10 +17,6 @@ const validConfig = () => ({
     subject: testSecret(),
     encryption: testSecret(),
   },
-  admin: {
-    username: 'ops',
-    passwordHash: 'scrypt$16384$8$1$c2FsdA$aGFzaA',
-  },
   databases: {
     oidc: 'postgres://oidc:secret@localhost:5432/oidc_test',
     accounts: 'postgres://reader:secret@localhost:5432/accounts_test',
@@ -109,11 +105,9 @@ test('rejects public or malformed database URLs', () => {
   assert.throws(() => loadConfig(input), /databases\.accounts/);
 });
 
-test('does not permit a default or missing administrator credential', () => {
-  const input = validConfig();
-  input.admin.passwordHash = 'changeme';
-
-  assert.throws(() => loadConfig(input), /admin\.passwordHash/);
+test('rejects obsolete configured administrator credentials', () => {
+  const input = { ...validConfig(), admin: { username: 'admin', passwordHash: 'obsolete' } };
+  assert.throws(() => loadConfig(input), /admin.*database/i);
 });
 
 test('rejects a non-integer port outside the TCP range', () => {

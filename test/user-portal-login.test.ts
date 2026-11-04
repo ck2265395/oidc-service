@@ -13,7 +13,7 @@ import { createUserPortalRouter } from '../src/modules/oidc/infrastructure/user-
 const config = {
   mode: 'development', issuer: 'http://127.0.0.1:3000', port: 3000,
   secrets: { legacyHmacKey: 'moondropapp&&', cookie: 'c'.repeat(43), fingerprint: 'f'.repeat(43), subject: 's'.repeat(43), encryption: 'e'.repeat(43) },
-  admin: { username: 'ops', passwordHash: 'hash' }, databases: { oidc: '', accounts: '' },
+  databases: { oidc: '', accounts: '' },
   redisUrl: 'redis://127.0.0.1:6379/0', redisUsername: null, redisPassword: null,
   trustedProxyCidrs: [], loginRateLimit: { windowSeconds: 900, accountAttempts: 10, ipAttempts: 100 },
   smtp: null, accountPortal: null, profilePictureBaseUrl: null,

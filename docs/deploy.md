@@ -30,9 +30,11 @@ OIDC_CONFIG_FILE=./runtime/config.local.json
 OIDC_SIGNING_KEY_FILE=./runtime/signing.local.json
 ```
 
-Test and production environments must not reuse or deploy these local files. Mount an environment-specific protected configuration and signing file through the deployment platform or secret manager, then set `OIDC_CONFIG_FILE` and `OIDC_SIGNING_KEY_FILE` to their absolute mounted paths. Keep database credentials, Redis credentials, SMTP passwords, administrator hashes, service secrets, and signing keys outside the image and repository.
+Test and production environments must not reuse or deploy these local files. Mount an environment-specific protected configuration and signing file through the deployment platform or secret manager, then set `OIDC_CONFIG_FILE` and `OIDC_SIGNING_KEY_FILE` to their absolute mounted paths. Keep database credentials, Redis credentials, SMTP passwords, service secrets, and signing keys outside the image and repository. Administrator credentials are stored only as password hashes in PostgreSQL.
 
 After building locally, run `npm run migrate:local` so the migration process loads `.env.local`. The plain `npm run migrate` intentionally does not load a local environment file; test and production deployments must inject their environment variables before invoking it.
+
+In `development` mode, the service creates `admin / 123456` only when `platform_admin` is empty and marks it for a password change. Test and production modes never seed credentials. After migrations, create the first administrator from an interactive protected terminal with `npm run admin:create`; the command reads `OIDC_CONFIG_FILE`, prompts without echoing the password, and writes only a scrypt hash to PostgreSQL.
 
 ## Migration 003: developer identities
 
@@ -105,7 +107,7 @@ Run `npm run sbom` after installing dependencies to generate `sbom.cdx.json` in 
 
 1. For the repository's local Compose stack, copy `runtime/config.example.json` to the ignored `runtime/config.local.json`, set `port` to `3000`, and replace every placeholder with local protected values. Set the OIDC database URL to `oidc-db` and Redis URL to `redis` for the Compose network. Configure the account database URL using a host reachable from the container.
 2. Set `mode` to `production`, configure the public HTTPS `issuer`, and list only actual reverse-proxy CIDRs in `trustedProxyCidrs`.
-3. Generate signing material with `npm run keys -- --out runtime/signing.local.json`; provide the other generated keys in the protected configuration and create an administrator password hash with `npm run admin:password`. Compose mounts these two ignored local files at `/run/identity/config.json` and `/run/identity/signing.json`. Test and production deployments must replace these bind mounts with their secret-manager or platform-specific protected mounts.
+3. Generate signing material with `npm run keys -- --out runtime/signing.local.json` and provide the other generated keys in the protected configuration. Compose mounts these two ignored local files at `/run/identity/config.json` and `/run/identity/signing.json`. Test and production deployments must replace these bind mounts with their secret-manager or platform-specific protected mounts. After migrations, create an administrator with `npm run admin:create` in an interactive protected terminal.
 4. Set `OIDC_DB_PASSWORD` to the same strong password configured in the OIDC database URL and Compose environment. Keep `runtime/` out of version control.
 5. Start PostgreSQL and Redis, then build and start the service:
 

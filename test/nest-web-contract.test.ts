@@ -12,7 +12,7 @@ const secret = () => randomBytes(32).toString('base64url');
 
 async function target(context: test.TestContext) {
   const path = join(tmpdir(), `nest-web-${randomBytes(6).toString('hex')}.json`);
-  await writeFile(path, JSON.stringify({ mode: 'test', issuer: 'http://127.0.0.1:3000', port: 3000, secrets: { legacyHmacKey: secret(), cookie: secret(), fingerprint: secret(), subject: secret(), encryption: secret() }, admin: { username: 'ops', passwordHash: 'scrypt$16384$8$1$salt$hash' }, databases: { oidc: 'postgres://a:b@localhost/a', accounts: 'postgres://a:b@localhost/b' }, redisUrl: 'redis://localhost:6379' }));
+  await writeFile(path, JSON.stringify({ mode: 'test', issuer: 'http://127.0.0.1:3000', port: 3000, secrets: { legacyHmacKey: secret(), cookie: secret(), fingerprint: secret(), subject: secret(), encryption: secret() }, databases: { oidc: 'postgres://a:b@localhost/a', accounts: 'postgres://a:b@localhost/b' }, redisUrl: 'redis://localhost:6379' }));
   const handle = await bootstrapNest({ configPath: path, port: 0, logger: false });
   context.after(handle.close);
   return `http://127.0.0.1:${handle.port}`;

@@ -9,10 +9,6 @@
     "subject": "CHANGE_ME_GENERATE_AN_INDEPENDENT_SECRET",
     "encryption": "CHANGE_ME_GENERATE_AN_INDEPENDENT_SECRET"
   },
-  "admin": {
-    "username": "CHANGE_ME",
-    "passwordHash": "GENERATE_WITH_NPM_RUN_ADMIN_PASSWORD"
-  },
   "databases": {
     "oidc": "postgres://OIDC_USER:CHANGE_ME@127.0.0.1:5432/oidc_local",
     "accounts": "postgres://READONLY_USER:CHANGE_ME@127.0.0.1:5432/accounts_local"

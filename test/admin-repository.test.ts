@@ -26,6 +26,14 @@ test('administrator repository creates one local default only when the table is 
   assert.deepEqual(calls[0]?.values, ['admin-id', 'admin', 'admin', 'scrypt-hash']);
 });
 
+test('administrator repository explicitly creates a database administrator', async () => {
+  const calls: Array<{ sql: string; values: unknown[] | undefined }> = [];
+  const repository = new PostgresAdminRepository({ async query(sql: string, values?: unknown[]) { calls.push({ sql, values }); return { rows: [], rowCount: 1 }; } } as never);
+  await repository.createAdministrator('admin-id', ' Operations ', 'scrypt-hash');
+  assert.match(calls[0]?.sql ?? '', /^INSERT INTO platform_admin/);
+  assert.deepEqual(calls[0]?.values, ['admin-id', 'Operations', 'operations', 'scrypt-hash']);
+});
+
 test('administrator sessions are owned by an active administrator', async () => {
   const calls: Array<{ sql: string; values: unknown[] | undefined }> = [];
   const repository = new PostgresAdminRepository({

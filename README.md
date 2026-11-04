@@ -31,10 +31,10 @@ GitHub Actions 在每次分支更新时运行类型检查、Lint、前端/Web/Na
 
 ## 运行准备
 
-1. 本地开发复制 `runtime/config.example.json` 为被 Git 忽略的 `runtime/config.local.json`，并填入账号只读库、OIDC 数据库、Redis、SMTP、管理员摘要及现有账号系统的 HMAC 密钥；若使用反向代理，仅在 `trustedProxyCidrs` 中列出实际代理网段。
+1. 本地开发复制 `runtime/config.example.json` 为被 Git 忽略的 `runtime/config.local.json`，并填入账号只读库、OIDC 数据库、Redis、SMTP 及现有账号系统的 HMAC 密钥；若使用反向代理，仅在 `trustedProxyCidrs` 中列出实际代理网段。
 2. 使用 `npm run keys -- --out runtime/signing.local.json` 生成本地签名材料；把生成的 cookie、fingerprint、subject、encryption 值填入本地配置。
 3. 复制 `.env.example` 为 `.env.local`。`npm run dev` 会从该文件读取 `OIDC_CONFIG_FILE` 和 `OIDC_SIGNING_KEY_FILE`，默认指向上述两个本地文件。
 4. 测试和正式环境不复制本地文件，也不提交环境专用 JSON；由部署系统挂载受保护配置和签名文件，并将两个环境变量设置为对应的绝对路径。
-5. 本地执行 `npm run build` 后使用 `npm run migrate:local` 应用版本化数据库迁移，再运行 `npm run dev`。测试和正式环境在部署系统已经注入变量后使用 `npm run migrate` 和 `npm start`。
+5. 本地执行 `npm run build` 后使用 `npm run migrate:local` 应用版本化数据库迁移，再运行 `npm run dev`。`development` 模式首次启动且管理员表为空时会创建 `admin / 123456`，首次登录后应立即更改；测试和正式环境不会自动创建管理员，迁移后使用已编译的 `npm run admin:create` 显式创建，再运行 `npm start`。本地显式创建可使用 `npm run admin:create:local` 自动读取 `.env.local`。
 
 不要提交 `runtime/config.local.json`、签名材料、实际密钥、管理员凭据、数据库连接串或 `.env` 文件。仓库中的 `runtime/config.example.json` 只描述字段结构，不能直接启动服务。
