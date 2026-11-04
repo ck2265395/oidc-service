@@ -1,9 +1,9 @@
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
-import { DeveloperReviewError } from '../../developer-store.js';
-import { ApplicationGroupError, type ApplicationGroupStatus } from '../../groups.js';
-import { ApplicationConflictError, type ApplicationStatus, type ReviewCommand } from '../../platform.js';
+import { DeveloperReviewError } from '../developer/infrastructure/developer.store.js';
+import { ApplicationGroupError, type ApplicationGroupStatus } from '../application/domain/groups.js';
+import { ApplicationConflictError, type ApplicationStatus, type ReviewCommand } from '../application/application/application-management.service.js';
 import { AdminAuthGuard } from './admin-auth.guard.js';
 import { AdminService } from './admin.service.js';
 

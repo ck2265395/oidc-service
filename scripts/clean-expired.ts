@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 
-import { loadConfig } from '../src/config.js';
-import { createPlatformPool } from '../src/store.js';
-import { expiredDataQueries } from '../src/cleanup.js';
+import { loadConfig } from '../src/infrastructure/config/config.schema.js';
+import { createPlatformPool } from '../src/modules/application/infrastructure/application.store.js';
+import { expiredDataQueries } from '../src/infrastructure/maintenance/expired-data.queries.js';
 
 const BATCH_SIZE = 5_000;
 

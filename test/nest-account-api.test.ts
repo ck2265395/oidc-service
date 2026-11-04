@@ -59,6 +59,17 @@ test('Nest account API preserves anonymous profile and session contracts', async
   assert.equal(body.data.account, null); assert.deepEqual(body.data.admin, { authenticated: false }); assert.match(body.data.csrfToken, /^[A-Za-z0-9_-]{43}$/);
 });
 
+test('Nest account API exposes administrator bootstrap without session identifiers', async (context) => {
+  const target = await service({ repository: {
+    async listAuthorizations() { return []; }, async authorizationOwned() { return false; }, async recordRevocation() {}, async adminAuthenticated() { return true; },
+  } }); context.after(target.close);
+  const response = await fetch(target.base + '/api/v1/session');
+  assert.equal(response.status, 200);
+  const body = await response.json() as { data: { admin: unknown } };
+  assert.deepEqual(body.data.admin, { authenticated: true, username: 'ops' });
+  assert.deepEqual(Object.keys(body.data.admin as object).sort(), ['authenticated', 'username']);
+});
+
 test('Nest account API enforces authorization ownership and CSRF before revocation', async (context) => {
   const target = await service(); context.after(target.close);
   const listed = await fetch(target.base + '/api/v1/account/authorizations');

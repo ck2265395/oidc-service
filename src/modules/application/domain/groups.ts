@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { DeveloperStatus } from './developer-identity.js';
+import type { DeveloperStatus } from '../../developer/domain/developer-identity.js';
 
 export type ApplicationGroupStatus = 'pending' | 'approved' | 'rejected' | 'disabled';
 

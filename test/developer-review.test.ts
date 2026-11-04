@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { DeveloperReviewError, PostgresDeveloperStore } from '../src/developer-store.js';
+import { DeveloperReviewError, PostgresDeveloperStore } from '../src/modules/developer/infrastructure/developer.store.js';
 
 const developerId = '11111111-1111-4111-8111-111111111111';
 

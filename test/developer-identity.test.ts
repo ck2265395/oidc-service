@@ -6,7 +6,7 @@ import {
   hashDeveloperPassword,
   normalizeDeveloperEmail,
   verifyDeveloperPassword,
-} from '../src/developer-identity.js';
+} from '../src/modules/developer/domain/developer-identity.js';
 
 test('normalizes developer email without locale-dependent rules', () => {
   assert.equal(normalizeDeveloperEmail('  Developer.Name@Example.COM  '), 'developer.name@example.com');

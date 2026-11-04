@@ -4,7 +4,7 @@ import test from 'node:test';
 import {
   ApplicationValidationError,
   validateApplicationDraft,
-} from '../src/applications.js';
+} from '../src/modules/application/domain/applications.js';
 
 const draft = (overrides: Record<string, unknown> = {}) => ({
   name: 'Demo client',

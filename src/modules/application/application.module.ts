@@ -2,11 +2,11 @@ import { type DynamicModule, Module } from '@nestjs/common';
 import type { Pool } from 'pg';
 
 import { OIDC_POOL } from '../../common/tokens/injection-tokens.js';
-import type { ServiceConfig } from '../../config.js';
-import { ApplicationGroupService } from '../../groups.js';
+import type { ServiceConfig } from '../../infrastructure/config/config.schema.js';
+import { ApplicationGroupService } from './domain/groups.js';
 import { ConfigService } from '../../infrastructure/config/config.service.js';
-import { ApplicationService } from '../../platform.js';
-import { PostgresApplicationRepository } from '../../store.js';
+import { ApplicationService } from './application/application-management.service.js';
+import { PostgresApplicationRepository } from './infrastructure/application.store.js';
 import { DeveloperService } from '../developer/developer.service.js';
 import { ApplicationController } from './application.controller.js';
 import { ApplicationApiService, type DeveloperAccessPort } from './application.service.js';

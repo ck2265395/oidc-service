@@ -1,7 +1,7 @@
 import { Global, Inject, Injectable, Module, type OnApplicationShutdown } from '@nestjs/common';
 
 import { MAILER } from '../../common/tokens/injection-tokens.js';
-import { createVerificationMailer } from '../../email-verification.js';
+import { createVerificationMailer } from '../../modules/developer/application/email-verification.service.js';
 import { ConfigService } from '../config/config.service.js';
 
 export type VerificationMailer = ReturnType<typeof createVerificationMailer>;

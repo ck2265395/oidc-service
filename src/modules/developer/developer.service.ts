@@ -3,10 +3,10 @@ import { timingSafeEqual } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
-import type { ServiceConfig } from '../../config.js';
-import type { DeveloperAccount, DeveloperStatus } from '../../developer-identity.js';
-import type { DeveloperSessionService } from '../../developer-session.js';
-import type { PostgresDeveloperStore } from '../../developer-store.js';
+import type { ServiceConfig } from '../../infrastructure/config/config.schema.js';
+import type { DeveloperAccount, DeveloperStatus } from './domain/developer-identity.js';
+import type { DeveloperSessionService } from './application/developer-session.service.js';
+import type { PostgresDeveloperStore } from './infrastructure/developer.store.js';
 
 export type DeveloperStorePort = Pick<PostgresDeveloperStore, 'getProfile' | 'saveProfile' | 'submitReview' | 'listReviewHistory' | 'findByExternalIdentity' | 'createExternalAccount' | 'bindExternalIdentity'>;
 export interface MoondropSubjectPort { subject(request: Request, response: Response): Promise<string | null>; }

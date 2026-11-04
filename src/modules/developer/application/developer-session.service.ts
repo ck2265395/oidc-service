@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
-import type { DeveloperAccount } from './developer-identity.js';
-import { randomToken } from './security.js';
+import type { DeveloperAccount } from '../domain/developer-identity.js';
+import { randomToken } from '../../../common/security/security.js';
 
 interface DeveloperSessionStore {
   createSession(developerId: string, sessionHash: string, absoluteExpiresAt: Date): Promise<void>;

@@ -1,19 +1,19 @@
 import { Pool, type PoolClient } from 'pg';
-import type { ApplicationGroupRecord, ApplicationGroupPage, ApplicationGroupRepository } from './groups.js';
+import type { ApplicationGroupRecord, ApplicationGroupPage, ApplicationGroupRepository } from '../domain/groups.js';
 
 import {
   validateApplicationDraft,
   type ApplicationDraft,
   type ClientType,
   type RuntimeEnvironment,
-} from './applications.js';
+} from '../domain/applications.js';
 import {
   ApplicationConflictError,
   type ApplicationRecord,
   type DeveloperProfileRecord,
   type ApplicationStatus,
   type ReviewRecord,
-} from './platform.js';
+} from '../application/application-management.service.js';
 
 export class PlatformStorageError extends Error {
   constructor() {

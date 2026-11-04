@@ -4,8 +4,8 @@ import test from 'node:test';
 import type { AdapterPayload } from 'oidc-provider';
 import type { Pool } from 'pg';
 
-import { PostgresOidcAdapter } from '../src/adapter.js';
-import type { ApplicationService } from '../src/platform.js';
+import { PostgresOidcAdapter } from '../src/modules/oidc/infrastructure/postgres-oidc.adapter.js';
+import type { ApplicationService } from '../src/modules/application/application/application-management.service.js';
 
 class FakeRedis {
   readonly values = new Map<string, string>();

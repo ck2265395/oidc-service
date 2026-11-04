@@ -3,12 +3,12 @@ import type { Pool } from 'pg';
 import type { RedisClientType } from 'redis';
 
 import { MAILER, OIDC_POOL, REDIS_COMMAND } from '../../common/tokens/injection-tokens.js';
-import type { ServiceConfig } from '../../config.js';
-import { DeveloperAuthService } from '../../developer-auth-service.js';
-import { DeveloperEmailCode } from '../../developer-email-code.js';
-import { hashDeveloperPassword } from '../../developer-identity.js';
-import { DeveloperSessionService } from '../../developer-session.js';
-import { PostgresDeveloperStore } from '../../developer-store.js';
+import type { ServiceConfig } from '../../infrastructure/config/config.schema.js';
+import { DeveloperAuthService } from './application/credential.service.js';
+import { DeveloperEmailCode } from './domain/email-code.js';
+import { hashDeveloperPassword } from '../developer/domain/developer-identity.js';
+import { DeveloperSessionService } from '../developer/application/developer-session.service.js';
+import { PostgresDeveloperStore } from '../developer/infrastructure/developer.store.js';
 import { ConfigService } from '../../infrastructure/config/config.service.js';
 import type { VerificationMailer } from '../../infrastructure/email/email.module.js';
 import { DeveloperAuthController } from './developer-auth.controller.js';

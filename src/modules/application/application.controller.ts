@@ -1,9 +1,9 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Put, Query, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
-import { ApplicationValidationError, type ClientType } from '../../applications.js';
-import { ApplicationGroupError } from '../../groups.js';
-import { ApplicationConflictError, type ApplicationRecord, type ApplicationStatus } from '../../platform.js';
+import { ApplicationValidationError, type ClientType } from './domain/applications.js';
+import { ApplicationGroupError } from './domain/groups.js';
+import { ApplicationConflictError, type ApplicationRecord, type ApplicationStatus } from './application/application-management.service.js';
 import { ApplicationApiService } from './application.service.js';
 
 function error(response: Response, status: number, code: string, desc: string): void { response.status(status).json({ code, desc, data: null }); }

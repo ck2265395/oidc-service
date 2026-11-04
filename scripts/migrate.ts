@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { createPlatformPool } from '../src/store.js';
-import { loadConfig } from '../src/config.js';
+import { createPlatformPool } from '../src/modules/application/infrastructure/application.store.js';
+import { loadConfig } from '../src/infrastructure/config/config.schema.js';
 
 const MIGRATION_LOCK_CLASS = 1_280_263_506;
 const MIGRATION_LOCK_ID = 1;

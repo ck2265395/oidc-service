@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import type { Request } from 'express';
 import type { Pool } from 'pg';
 
-import { readCookie } from '../../../http-security.js';
-import type { ServiceConfig } from '../../../config.js';
+import { readCookie } from '../../../common/security/http-security.js';
+import type { ServiceConfig } from '../../../infrastructure/config/config.schema.js';
 import type { AccountRepositoryPort, AuthorizationView } from '../application/account.service.js';
 
 export class AccountRepository implements AccountRepositoryPort {

@@ -58,6 +58,8 @@ jobs:
           node --input-type=module -e "import ts from 'typescript'; import { readFileSync } from 'node:fs'; const result = ts.transpileModule(readFileSync('examples/native/App.tsx', 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 }, reportDiagnostics: true }); if (result.diagnostics?.length) { console.error(result.diagnostics); process.exit(1); }"
       - name: Unit and HTTP tests
         run: npm test
+      - name: Console tests
+        run: npm run test:web
       - name: PostgreSQL and Redis integration tests
         run: npm run test:storage
       - name: Build

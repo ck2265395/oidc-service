@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { Request } from 'express';
 
-import type { ServiceConfig } from '../../config.js';
-import type { ApplicationGroupService } from '../../groups.js';
-import type { ApplicationService } from '../../platform.js';
-import type { DeveloperStatus } from '../../developer-identity.js';
+import type { ServiceConfig } from '../../infrastructure/config/config.schema.js';
+import type { ApplicationGroupService } from './domain/groups.js';
+import type { ApplicationService } from './application/application-management.service.js';
+import type { DeveloperStatus } from '../developer/domain/developer-identity.js';
 
 export interface DeveloperAccessPort {
   authenticated(request: Request): Promise<{ id: string; status: DeveloperStatus } | null>;

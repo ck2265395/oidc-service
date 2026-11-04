@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { LoginRateLimitError, RedisLoginRateLimiter } from '../src/login-limiter.js';
+import { LoginRateLimitError, RedisLoginRateLimiter } from '../src/modules/oidc/infrastructure/login-rate-limiter.js';
 
 class FakeRedis {
   calls: Array<{ script: string; options: { keys: string[]; arguments: string[] } }> = [];

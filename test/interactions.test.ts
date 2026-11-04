@@ -5,10 +5,10 @@ import test from 'node:test';
 import express from 'express';
 import type Provider from 'oidc-provider';
 
-import type { AccountService } from '../src/accounts.js';
-import { createInteractionRouter } from '../src/interactions.js';
-import type { RedisLoginRateLimiter } from '../src/login-limiter.js';
-import type { ApplicationService } from '../src/platform.js';
+import type { AccountService } from '../src/modules/account/domain/accounts.js';
+import { createInteractionRouter } from '../src/modules/oidc/infrastructure/interaction.router.js';
+import type { RedisLoginRateLimiter } from '../src/modules/oidc/infrastructure/login-rate-limiter.js';
+import type { ApplicationService } from '../src/modules/application/application/application-management.service.js';
 
 test('renders the login interaction with the unified identity shell', async (context) => {
   const provider = {

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 import { Injectable } from '@nestjs/common';
 
-import { loadConfig, type ServiceConfig } from '../../config.js';
+import { loadConfig, type ServiceConfig } from './config.schema.js';
 
 function freeze<T>(value: T): T {
   if (typeof value !== 'object' || value === null || Object.isFrozen(value)) return value;

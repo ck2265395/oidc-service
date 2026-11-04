@@ -1,7 +1,7 @@
 import { Provider, type AdapterFactory, type Configuration, type JWKS } from 'oidc-provider';
 
-import { AccountService, claimsForScopes } from './accounts.js';
-import type { ApplicationService } from './platform.js';
+import { AccountService, claimsForScopes } from '../../account/domain/accounts.js';
+import type { ApplicationService } from '../../application/application/application-management.service.js';
 
 const ACCOUNT_ID_SEPARATOR = '.';
 export const PORTAL_CLIENT_ID = 'dt-identity-portal';

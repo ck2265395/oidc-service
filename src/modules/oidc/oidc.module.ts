@@ -2,13 +2,13 @@ import { type DynamicModule, Module } from '@nestjs/common';
 import type { Pool } from 'pg';
 import type { RedisClientType } from 'redis';
 
-import type { AccountService } from '../../accounts.js';
+import type { AccountService } from '../account/domain/accounts.js';
 import { MAILER, OIDC_POOL, OIDC_SIGNING_KEYS, REDIS_COMMAND, REDIS_SUBSCRIBER } from '../../common/tokens/injection-tokens.js';
-import { DeveloperEmailVerification } from '../../email-verification.js';
+import { DeveloperEmailVerification } from '../developer/application/email-verification.service.js';
 import type { VerificationMailer } from '../../infrastructure/email/email.module.js';
 import { ConfigService } from '../../infrastructure/config/config.service.js';
 import type { SigningKeyService } from '../../infrastructure/keys/signing-key.service.js';
-import { ApplicationService } from '../../platform.js';
+import { ApplicationService } from '../application/application/application-management.service.js';
 import { ACCOUNT_RESOLVER, ProviderSessionGateway } from '../account/account.module.js';
 import { DeveloperService } from '../developer/developer.service.js';
 import { OidcAuditService } from './oidc-audit.service.js';

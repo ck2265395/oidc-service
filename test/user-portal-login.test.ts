@@ -6,9 +6,9 @@ import express from 'express';
 import type Provider from 'oidc-provider';
 import type { Pool } from 'pg';
 
-import type { AccountService } from '../src/accounts.js';
-import type { ServiceConfig } from '../src/config.js';
-import { createUserPortalRouter } from '../src/user-portal.js';
+import type { AccountService } from '../src/modules/account/domain/accounts.js';
+import type { ServiceConfig } from '../src/infrastructure/config/config.schema.js';
+import { createUserPortalRouter } from '../src/modules/oidc/infrastructure/user-portal.router.js';
 
 const config = {
   mode: 'development', issuer: 'http://127.0.0.1:3000', port: 3000,

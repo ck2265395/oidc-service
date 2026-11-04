@@ -6,8 +6,8 @@ import express from 'express';
 import type { Pool } from 'pg';
 
 import { createAdminLoginRouter } from '../src/modules/admin/admin-login.router.js';
-import type { ServiceConfig } from '../src/config.js';
-import { hashScryptPassword } from '../src/security.js';
+import type { ServiceConfig } from '../src/infrastructure/config/config.schema.js';
+import { hashScryptPassword } from '../src/common/security/security.js';
 
 test('accepts an opaque Origin only for a browser-declared same-origin form', async (context) => {
   const pool = {

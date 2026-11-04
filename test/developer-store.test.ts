@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { PostgresDeveloperStore } from '../src/developer-store.js';
+import { PostgresDeveloperStore } from '../src/modules/developer/infrastructure/developer.store.js';
 
 test('creates an email developer account and profile in one transaction', async () => {
   const statements: string[] = [];
+  const parameters: Array<readonly unknown[] | undefined> = [];
   const client = {
-    async query(sql: string): Promise<{ rows: unknown[]; rowCount: number }> {
+    async query(sql: string, values?: readonly unknown[]): Promise<{ rows: unknown[]; rowCount: number }> {
       statements.push(sql);
+      parameters.push(values);
       if (sql.startsWith('INSERT INTO developer_account')) {
         return { rows: [{ id: '11111111-1111-4111-8111-111111111111', status: 'unsubmitted', revision: 1, last_review: null, submitted_at: null, approved_at: null }], rowCount: 1 };
       }
@@ -30,6 +32,8 @@ test('creates an email developer account and profile in one transaction', async 
   assert.match(statements[1] ?? '', /^INSERT INTO developer_account/);
   assert.match(statements[2] ?? '', /^INSERT INTO developer_password_credential/);
   assert.match(statements[3] ?? '', /^INSERT INTO developer_profile/);
+  assert.match(statements[3] ?? '', /VALUES \(\$1, \$2,/);
+  assert.deepEqual(parameters[3]?.slice(0, 2), [account.id, account.id]);
   assert.equal(statements.at(-1), 'COMMIT');
 });
 

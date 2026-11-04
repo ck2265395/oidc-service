@@ -2,9 +2,9 @@ import { type DynamicModule, Module } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type { Pool } from 'pg';
 
-import { AccountService, PostgresAccountSource } from '../../accounts.js';
+import { AccountService, PostgresAccountSource } from './domain/accounts.js';
 import { ACCOUNT_POOL, OIDC_POOL } from '../../common/tokens/injection-tokens.js';
-import type { ServiceConfig } from '../../config.js';
+import type { ServiceConfig } from '../../infrastructure/config/config.schema.js';
 import { ConfigService } from '../../infrastructure/config/config.service.js';
 import { AccountApplicationService, type AccountRepositoryPort, type AccountResolutionPort, type ProviderSessionPort } from './application/account.service.js';
 import { AccountController } from './controllers/account.controller.js';

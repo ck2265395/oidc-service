@@ -1,1 +1,1 @@
-export { PostgresApplicationRepository as ApplicationRepository } from '../../../store.js';
+export { PostgresApplicationRepository as ApplicationRepository } from './application.store.js';

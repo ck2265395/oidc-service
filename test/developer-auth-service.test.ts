@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { DeveloperAuthError, DeveloperAuthService } from '../src/developer-auth-service.js';
-import { DeveloperEmailCode } from '../src/developer-email-code.js';
-import { hashDeveloperPassword } from '../src/developer-identity.js';
+import { DeveloperAuthError, DeveloperAuthService } from '../src/modules/developer-auth/application/credential.service.js';
+import { DeveloperEmailCode } from '../src/modules/developer-auth/domain/email-code.js';
+import { hashDeveloperPassword } from '../src/modules/developer/domain/developer-identity.js';
 
 test('email code stores only a keyed digest and can be consumed once', async () => {
   const values = new Map<string, string>();

@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import nodemailer from 'nodemailer';
 import type { RedisClientType } from 'redis';
 
-import type { ApplicationService } from './platform.js';
+import type { ApplicationService } from '../../application/application/application-management.service.js';
 
 interface VerificationPayload {
   accountUuid: string;

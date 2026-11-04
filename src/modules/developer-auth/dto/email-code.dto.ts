@@ -1,4 +1,4 @@
-import type { DeveloperEmailCodePurpose } from '../../../developer-email-code.js';
+import type { DeveloperEmailCodePurpose } from '../domain/email-code.js';
 
 export class EmailCodeDto {
   email = '';

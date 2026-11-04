@@ -3,11 +3,11 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import express, { type Request, type Response, Router } from 'express';
 import type Provider from 'oidc-provider';
 
-import { AccountService, type LoginType } from './accounts.js';
-import { accountHandle, PORTAL_CLIENT_ID } from './provider.js';
-import type { ApplicationService } from './platform.js';
-import { LoginRateLimitError, type RedisLoginRateLimiter } from './login-limiter.js';
-import { escapeHtml } from './security.js';
+import { AccountService, type LoginType } from '../../account/domain/accounts.js';
+import { accountHandle, PORTAL_CLIENT_ID } from './provider.factory.js';
+import type { ApplicationService } from '../../application/application/application-management.service.js';
+import { LoginRateLimitError, type RedisLoginRateLimiter } from './login-rate-limiter.js';
+import { escapeHtml } from '../../../common/security/security.js';
 
 const COOKIE_NAME = '__Host-dt-csrf';
 const LOCAL_COOKIE_NAME = 'dt-csrf';

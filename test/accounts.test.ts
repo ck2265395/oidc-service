@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHmac, randomBytes } from 'node:crypto';
 import test from 'node:test';
 
-import { AccountService, PostgresAccountSource, claimsForScopes, type AccountRecord, type AccountSource } from '../src/accounts.js';
+import { AccountService, PostgresAccountSource, claimsForScopes, type AccountRecord, type AccountSource } from '../src/modules/account/domain/accounts.js';
 import type { Pool } from 'pg';
 
 const legacyHmacKey = 'independent-test-only-legacy-key';

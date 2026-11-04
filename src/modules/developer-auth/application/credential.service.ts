@@ -1,5 +1,5 @@
-import type { DeveloperAccount, DeveloperStatus, PasswordDigest } from './developer-identity.js';
-import { hashDeveloperPassword, normalizeDeveloperEmail, verifyDeveloperPassword } from './developer-identity.js';
+import type { DeveloperAccount, DeveloperStatus, PasswordDigest } from '../../developer/domain/developer-identity.js';
+import { hashDeveloperPassword, normalizeDeveloperEmail, verifyDeveloperPassword } from '../../developer/domain/developer-identity.js';
 
 export interface DeveloperCredential {
   developerId: string;

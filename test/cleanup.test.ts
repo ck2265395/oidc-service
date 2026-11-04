@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { expiredDataQueries } from '../src/cleanup.js';
+import { expiredDataQueries } from '../src/infrastructure/maintenance/expired-data.queries.js';
 
 test('expired data cleanup removes stale and revoked developer sessions in bounded batches', () => {
   const query = expiredDataQueries.find(([label]) => label === 'expired developer sessions');

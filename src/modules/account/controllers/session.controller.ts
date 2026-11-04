@@ -1,7 +1,7 @@
 import { Controller, Get, Inject, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
-import { setConsoleCsrf } from '../../../http-security.js';
+import { setConsoleCsrf } from '../../../common/security/http-security.js';
 import { AccountApplicationService } from '../application/account.service.js';
 
 @Controller('api/v1/session')

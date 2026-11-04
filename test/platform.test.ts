@@ -9,9 +9,9 @@ import {
   replaceApplicationDraft,
   reviewApplication,
   submitApplicationForReview,
-} from '../src/platform.js';
-import { validateApplicationDraft } from '../src/applications.js';
-import type { ApplicationPage, ApplicationRepository } from '../src/store.js';
+} from '../src/modules/application/application/application-management.service.js';
+import { validateApplicationDraft } from '../src/modules/application/domain/applications.js';
+import type { ApplicationPage, ApplicationRepository } from '../src/modules/application/infrastructure/application.store.js';
 
 const validDraft = (name: string, groupId: string | null = null) => validateApplicationDraft({
   name,
@@ -116,11 +116,11 @@ test('stale revisions and reviews without reasons are rejected', () => {
 });
 
 class MemoryRepository implements ApplicationRepository {
-  readonly records = new Map<string, import('../src/platform.js').ApplicationRecord>();
+  readonly records = new Map<string, import('../src/modules/application/application/application-management.service.js').ApplicationRecord>();
   readonly groups = new Set<string>();
   readonly approvedGroups = new Set<string>();
 
-  async createApplication(record: import('../src/platform.js').ApplicationRecord): Promise<void> {
+  async createApplication(record: import('../src/modules/application/application/application-management.service.js').ApplicationRecord): Promise<void> {
     this.records.set(record.id, record);
   }
 
@@ -145,7 +145,7 @@ class MemoryRepository implements ApplicationRepository {
     return this.approvedGroups.has(ownerUuid + ':' + groupId);
   }
 
-  async compareAndSwap(previous: import('../src/platform.js').ApplicationRecord, next: import('../src/platform.js').ApplicationRecord) {
+  async compareAndSwap(previous: import('../src/modules/application/application/application-management.service.js').ApplicationRecord, next: import('../src/modules/application/application/application-management.service.js').ApplicationRecord) {
     const current = this.records.get(previous.id);
     if (!current || current.revision !== previous.revision || current.status !== previous.status) return false;
     this.records.set(next.id, next);

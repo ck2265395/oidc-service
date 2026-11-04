@@ -1,1 +1,1 @@
-export { PostgresDeveloperStore as DeveloperRepository } from '../../../developer-store.js';
+export { PostgresDeveloperStore as DeveloperRepository } from './developer.store.js';

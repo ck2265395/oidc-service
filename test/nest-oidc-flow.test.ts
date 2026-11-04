@@ -9,7 +9,7 @@ import express from 'express';
 import { exportJWK } from 'jose';
 import type { Adapter, AdapterPayload, JWKS } from 'oidc-provider';
 
-import { accountHandle, createProvider, PORTAL_CLIENT_ID } from '../src/provider.js';
+import { accountHandle, createProvider, PORTAL_CLIENT_ID } from '../src/modules/oidc/infrastructure/provider.factory.js';
 import { mountProtocolMiddleware } from '../src/modules/oidc/oidc-protocol.middleware.js';
 
 const values = new Map<string, AdapterPayload>();

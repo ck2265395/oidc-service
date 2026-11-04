@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { DeveloperSessionService } from '../src/developer-session.js';
+import { DeveloperSessionService } from '../src/modules/developer/application/developer-session.service.js';
 
 test('developer sessions store only a SHA-256 digest and resolve current account state', async () => {
   let storedHash = '';

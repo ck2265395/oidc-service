@@ -10,7 +10,7 @@ import {
   hashScryptPassword,
   randomToken,
   verifyScryptPassword,
-} from '../src/security.js';
+} from '../src/common/security/security.js';
 
 const testKey = () => randomBytes(32).toString('base64url');
 

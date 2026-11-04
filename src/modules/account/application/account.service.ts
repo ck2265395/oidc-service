@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
-import type { AccountIdentity } from '../../../accounts.js';
-import { safeProfilePictureUrl } from '../../../accounts.js';
-import type { ServiceConfig } from '../../../config.js';
+import type { AccountIdentity } from '../domain/accounts.js';
+import { safeProfilePictureUrl } from '../domain/accounts.js';
+import type { ServiceConfig } from '../../../infrastructure/config/config.schema.js';
 
 export interface AccountResolutionPort {
   resolve(uuid: string, fingerprint: string, sector?: string): Promise<AccountIdentity | null>;

@@ -1,8 +1,8 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 
-import type { ServiceConfig } from '../../config.js';
-import type { DeveloperSessionService } from '../../developer-session.js';
-import type { PostgresDeveloperStore } from '../../developer-store.js';
+import type { ServiceConfig } from '../../infrastructure/config/config.schema.js';
+import type { DeveloperSessionService } from './application/developer-session.service.js';
+import type { PostgresDeveloperStore } from './infrastructure/developer.store.js';
 import { ConfigService } from '../../infrastructure/config/config.service.js';
 import { AccountApplicationService } from '../account/application/account.service.js';
 import { DEVELOPER_SESSIONS, DEVELOPER_STORE, DeveloperAuthModule } from '../developer-auth/developer-auth.module.js';

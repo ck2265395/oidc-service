@@ -1,7 +1,7 @@
 import type { Adapter, AdapterFactory, AdapterPayload } from 'oidc-provider';
 import type { Pool } from 'pg';
 
-import type { ApplicationService } from './platform.js';
+import type { ApplicationService } from '../../application/application/application-management.service.js';
 
 interface RedisStateStore {
   get(key: string): Promise<string | null>;

@@ -1,9 +1,9 @@
 import { Body, Controller, Get, HttpCode, Inject, Post, Put, Query, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
-import { DeveloperReviewError } from '../../developer-store.js';
-import { EmailVerificationError } from '../../email-verification.js';
-import { randomToken } from '../../security.js';
+import { DeveloperReviewError } from './infrastructure/developer.store.js';
+import { EmailVerificationError } from './application/email-verification.service.js';
+import { randomToken } from '../../common/security/security.js';
 import { DeveloperService } from './developer.service.js';
 
 function jsonError(response: Response, status: number, code: string, desc: string): void { response.status(status).json({ code, desc, data: null }); }

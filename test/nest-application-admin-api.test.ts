@@ -6,7 +6,8 @@ import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import express from 'express';
 
-import { ApplicationConflictError } from '../src/platform.js';
+import { ApplicationConflictError } from '../src/modules/application/application/application-management.service.js';
+import { DeveloperReviewError } from '../src/modules/developer/infrastructure/developer.store.js';
 import { ApplicationModule, type ApplicationModuleOptions } from '../src/modules/application/application.module.js';
 import { AdminModule, type AdminModuleOptions } from '../src/modules/admin/admin.module.js';
 import { ApplicationExceptionFilter } from '../src/common/filters/application-exception.filter.js';
@@ -64,4 +65,17 @@ test('Nest application and admin API validates audit pagination', async (context
   assert.equal(invalid.status, 400);
   const valid = await fetch(target.base + '/api/v1/admin/audit?page=2', { headers: { 'x-admin-test': 'yes' } });
   assert.equal(valid.status, 200); assert.equal((await valid.json() as { data: { page: number } }).data.page, 2);
+});
+
+test('Nest admin developer review validates pagination, reasons, and optimistic conflicts', async (context) => {
+  const target = await service({}, { developers: {
+    async listForAdmin() { return { total: 0, list: [] }; }, async getForAdmin() { return null; },
+    async reviewDeveloper() { throw new DeveloperReviewError('review_conflict'); },
+  } as never }); context.after(target.close);
+  const headers = { ...writeHeaders, 'x-admin-test': 'yes' };
+  assert.equal((await fetch(target.base + '/api/v1/admin/developers?page=0', { headers })).status, 400);
+  const missingReason = await fetch(target.base + '/api/v1/admin/developers/dev-1/review', { method: 'POST', headers, body: JSON.stringify({ action: 'reject', expectedRevision: 1 }) });
+  assert.equal(missingReason.status, 400);
+  const conflict = await fetch(target.base + '/api/v1/admin/developers/dev-1/review', { method: 'POST', headers, body: JSON.stringify({ action: 'reject', expectedRevision: 1, reason: 'incomplete' }) });
+  assert.equal(conflict.status, 409);
 });

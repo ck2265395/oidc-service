@@ -6,11 +6,11 @@ import { test } from 'node:test';
 import { createClient } from 'redis';
 import type { AdapterPayload } from 'oidc-provider';
 
-import { ApplicationGroupService } from '../../src/groups.js';
-import { PostgresOidcAdapter } from '../../src/adapter.js';
-import { LoginRateLimitError, RedisLoginRateLimiter } from '../../src/login-limiter.js';
-import { ApplicationService } from '../../src/platform.js';
-import { createPlatformPool, PostgresApplicationRepository } from '../../src/store.js';
+import { ApplicationGroupService } from '../../src/modules/application/domain/groups.js';
+import { PostgresOidcAdapter } from '../../src/modules/oidc/infrastructure/postgres-oidc.adapter.js';
+import { LoginRateLimitError, RedisLoginRateLimiter } from '../../src/modules/oidc/infrastructure/login-rate-limiter.js';
+import { ApplicationService } from '../../src/modules/application/application/application-management.service.js';
+import { createPlatformPool, PostgresApplicationRepository } from '../../src/modules/application/infrastructure/application.store.js';
 
 const databaseUrl = process.env.OIDC_TEST_DATABASE_URL;
 const redisUrl = process.env.REDIS_TEST_URL;

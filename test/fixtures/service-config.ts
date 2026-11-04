@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { loadConfig, type ServiceConfig } from '../../src/config.js';
+import { loadConfig, type ServiceConfig } from '../../src/infrastructure/config/config.schema.js';
 
 const secret = (): string => randomBytes(32).toString('base64url');
 

@@ -1,7 +1,7 @@
 import { Controller, Delete, Get, Inject, Param, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
-import { consoleMutationAllowed } from '../../../http-security.js';
+import { consoleMutationAllowed } from '../../../common/security/http-security.js';
 import { AccountApplicationService } from '../application/account.service.js';
 
 @Controller('api/v1/account')

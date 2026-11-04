@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
-import { validateApplicationDraft, type ApplicationDraft, type ClientType, type RuntimeEnvironment } from './applications.js';
-import type { DeveloperStatus } from './developer-identity.js';
-import { decryptSecret, encryptSecret, randomToken } from './security.js';
-import type { ApplicationRepository, ApplicationPage } from './store.js';
+import { validateApplicationDraft, type ApplicationDraft, type ClientType, type RuntimeEnvironment } from '../domain/applications.js';
+import type { DeveloperStatus } from '../../developer/domain/developer-identity.js';
+import { decryptSecret, encryptSecret, randomToken } from '../../../common/security/security.js';
+import type { ApplicationRepository, ApplicationPage } from '../infrastructure/application.store.js';
 
 export type ApplicationStatus = 'draft' | 'pending' | 'rejected' | 'approved' | 'disabled';
 

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import test from 'node:test';
 
-import { ConfigError, loadConfig } from '../src/config.js';
+import { ConfigError, loadConfig } from '../src/infrastructure/config/config.schema.js';
 
 const testSecret = () => randomBytes(32).toString('base64url');
 

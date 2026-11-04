@@ -4,11 +4,11 @@ import { Injectable } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type { Pool } from 'pg';
 
-import type { ServiceConfig } from '../../config.js';
-import type { ApplicationGroupService } from '../../groups.js';
-import { consoleMutationAllowed, readCookie } from '../../http-security.js';
-import type { ApplicationService } from '../../platform.js';
-import type { PostgresDeveloperStore } from '../../developer-store.js';
+import type { ServiceConfig } from '../../infrastructure/config/config.schema.js';
+import type { ApplicationGroupService } from '../application/domain/groups.js';
+import { consoleMutationAllowed, readCookie } from '../../common/security/http-security.js';
+import type { ApplicationService } from '../application/application/application-management.service.js';
+import type { PostgresDeveloperStore } from '../developer/infrastructure/developer.store.js';
 
 export interface AdminAuthPort { authenticated(request: Request): Promise<boolean>; mutationAllowed(request: Request): boolean; logout(request: Request, response: Response): Promise<void>; }
 export interface AdminAuditPort { overview(): Promise<unknown>; list(page: number): Promise<unknown>; statistics(days: number): Promise<unknown>; recordDeveloperReview(id: string, action: string): Promise<void>; }

@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import type { PoolClient, QueryResult } from 'pg';
 
-import type { DeveloperCredential } from './developer-auth-service.js';
-import { assertDeveloperTransition, type DeveloperAccount, type DeveloperProfile, type DeveloperReviewAction, type PasswordDigest } from './developer-identity.js';
+import type { DeveloperCredential } from '../../developer-auth/application/credential.service.js';
+import { assertDeveloperTransition, type DeveloperAccount, type DeveloperProfile, type DeveloperReviewAction, type PasswordDigest } from '../domain/developer-identity.js';
 
 interface Queryable {
   query<T extends object = Record<string, unknown>>(sql: string, values?: readonly unknown[]): Promise<QueryResult<T>>;
@@ -99,8 +99,8 @@ export class PostgresDeveloperStore {
         [id, input.emailNormalized, input.emailDisplay, JSON.stringify(input.passwordDigest)],
       );
       await client.query(
-        'INSERT INTO developer_profile (account_uuid, developer_id, display_name, contact_email, contact_email_verified, purpose) VALUES ($1, $1, $2, $3, true, $4)',
-        [id, input.emailDisplay.split('@')[0] ?? input.emailDisplay, input.emailDisplay, ''],
+        'INSERT INTO developer_profile (account_uuid, developer_id, display_name, contact_email, contact_email_verified, purpose) VALUES ($1, $2, $3, $4, true, $5)',
+        [id, id, input.emailDisplay.split('@')[0] ?? input.emailDisplay, input.emailDisplay, ''],
       );
       await client.query('COMMIT');
       return mapAccount(account);

@@ -1,4 +1,4 @@
-import { hashScryptPassword } from '../src/security.js';
+import { hashScryptPassword } from '../src/common/security/security.js';
 import { open, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 

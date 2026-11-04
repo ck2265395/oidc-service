@@ -6,8 +6,8 @@ import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import express from 'express';
 
-import { DeveloperAuthError } from '../src/developer-auth-service.js';
-import { DeveloperReviewError } from '../src/developer-store.js';
+import { DeveloperAuthError } from '../src/modules/developer-auth/application/credential.service.js';
+import { DeveloperReviewError } from '../src/modules/developer/infrastructure/developer.store.js';
 import { DeveloperAuthModule, type DeveloperAuthModuleOptions } from '../src/modules/developer-auth/developer-auth.module.js';
 import { DeveloperModule, type DeveloperModuleOptions } from '../src/modules/developer/developer.module.js';
 import { testServiceConfig } from './fixtures/service-config.js';
@@ -86,6 +86,21 @@ test('Nest developer API binds a verified MOONDROP subject to the credential acc
   }, body: JSON.stringify({ email: 'same@example.com', password: 'Developer Password 42!' }) });
   assert.equal(response.status, 200);
   assert.deepEqual(bound, ['credential-owner-9', 'moondrop', 'moondrop-user-1']);
+});
+
+test('Nest developer API creates a MOONDROP identity and establishes its session', async (context) => {
+  let created = 0;
+  const target = await service({}, { store: {
+    async getProfile() { return null; }, async saveProfile() { throw new Error('unused'); }, async submitReview() { throw new Error('unused'); }, async listReviewHistory() { return []; },
+    async findByExternalIdentity() { return null; }, async createExternalAccount() { created += 1; return account; }, async bindExternalIdentity() {},
+  } }); context.after(target.close);
+  const csrf = 'm'.repeat(43);
+  const response = await fetch(target.base + '/api/v1/developer/moondrop/create', { method: 'POST', headers: {
+    origin: 'https://identity.example.test', cookie: `__Host-dt-api-csrf=${csrf}`, 'x-csrf-token': csrf,
+  } });
+  assert.equal(response.status, 201);
+  assert.equal(created, 1);
+  assert.match(response.headers.get('set-cookie') ?? '', /^md-developer=/);
 });
 
 test('Nest developer API enforces origin and CSRF on logout', async (context) => {

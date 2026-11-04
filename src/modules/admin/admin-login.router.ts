@@ -3,9 +3,9 @@ import { createHash, createHmac } from 'node:crypto';
 import express, { type Request, type Response, Router } from 'express';
 import type { Pool } from 'pg';
 
-import type { ServiceConfig } from '../../config.js';
-import { readCookie } from '../../http-security.js';
-import { constantTimeEqual, escapeHtml, randomToken, verifyScryptPassword } from '../../security.js';
+import type { ServiceConfig } from '../../infrastructure/config/config.schema.js';
+import { readCookie } from '../../common/security/http-security.js';
+import { constantTimeEqual, escapeHtml, randomToken, verifyScryptPassword } from '../../common/security/security.js';
 
 function scalar(value: unknown): string | null { return typeof value === 'string' ? value : null; }
 function body(request: Request): Record<string, unknown> { return typeof request.body === 'object' && request.body !== null && !Array.isArray(request.body) ? request.body as Record<string, unknown> : {}; }

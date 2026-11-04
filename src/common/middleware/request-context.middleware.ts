@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { LoggerService } from '@nestjs/common';
 import type { Express, NextFunction, Request, Response } from 'express';
 
-import type { ServiceConfig } from '../../config.js';
+import type { ServiceConfig } from '../../infrastructure/config/config.schema.js';
 import { requestLogger } from '../logging/request-logger.middleware.js';
 
 const requestIdPattern = /^[A-Za-z0-9._-]{8,128}$/;

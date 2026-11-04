@@ -3,12 +3,12 @@ import { timingSafeEqual } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
-import type { DeveloperAuthService as DomainAuthService } from '../../developer-auth-service.js';
-import type { DeveloperEmailCode } from '../../developer-email-code.js';
-import type { DeveloperAccount } from '../../developer-identity.js';
-import { normalizeDeveloperEmail } from '../../developer-identity.js';
-import type { DeveloperSessionService } from '../../developer-session.js';
-import { randomToken } from '../../security.js';
+import type { DeveloperAuthService as DomainAuthService } from './application/credential.service.js';
+import type { DeveloperEmailCode } from './domain/email-code.js';
+import type { DeveloperAccount } from '../developer/domain/developer-identity.js';
+import { normalizeDeveloperEmail } from '../developer/domain/developer-identity.js';
+import type { DeveloperSessionService } from '../developer/application/developer-session.service.js';
+import { randomToken } from '../../common/security/security.js';
 
 export interface DeveloperIdentityMethods { listAuthenticationMethods(developerId: string): Promise<string[]>; }
 

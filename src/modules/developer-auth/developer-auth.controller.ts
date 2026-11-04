@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Inject, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
-import { DeveloperAuthError } from '../../developer-auth-service.js';
+import { DeveloperAuthError } from './application/credential.service.js';
 import { NestDeveloperAuthService } from './developer-auth.service.js';
 
 function error(response: Response, status: number, code: string, desc: string): void { response.status(status).json({ code, desc, data: null }); }
