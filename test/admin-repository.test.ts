@@ -4,7 +4,7 @@ import test from 'node:test';
 import { PostgresAdminRepository } from '../src/modules/admin/infrastructure/admin.repository.js';
 
 test('administrator repository uses normalized parameterized lookup', async () => {
-  const calls: Array<{ sql: string; values?: unknown[] }> = [];
+  const calls: Array<{ sql: string; values: unknown[] | undefined }> = [];
   const repository = new PostgresAdminRepository({
     async query(sql: string, values?: unknown[]) {
       calls.push({ sql, values });
@@ -18,7 +18,7 @@ test('administrator repository uses normalized parameterized lookup', async () =
 });
 
 test('administrator repository creates one local default only when the table is empty', async () => {
-  const calls: Array<{ sql: string; values?: unknown[] }> = [];
+  const calls: Array<{ sql: string; values: unknown[] | undefined }> = [];
   const repository = new PostgresAdminRepository({ async query(sql: string, values?: unknown[]) { calls.push({ sql, values }); return { rows: [], rowCount: 1 }; } } as never);
   assert.equal(await repository.createLocalDefault('admin-id', 'admin', 'scrypt-hash'), true);
   assert.match(calls[0]?.sql ?? '', /NOT EXISTS/);
@@ -27,7 +27,7 @@ test('administrator repository creates one local default only when the table is 
 });
 
 test('administrator sessions are owned by an active administrator', async () => {
-  const calls: Array<{ sql: string; values?: unknown[] }> = [];
+  const calls: Array<{ sql: string; values: unknown[] | undefined }> = [];
   const repository = new PostgresAdminRepository({
     async query(sql: string, values?: unknown[]) {
       calls.push({ sql, values });

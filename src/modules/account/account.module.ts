@@ -13,6 +13,7 @@ import { MeController } from './controllers/me.controller.js';
 import { SessionController } from './controllers/session.controller.js';
 import { AccountRepository } from './infrastructure/account.repository.js';
 import { PostgresAdminAuth, type AdminAuthPort } from '../admin/infrastructure/admin-auth.js';
+import { PostgresAdminRepository } from '../admin/infrastructure/admin.repository.js';
 import { ADMIN_SESSION_AUTH, PROVIDER_SESSIONS } from './account.tokens.js';
 
 export interface AccountModuleOptions {
@@ -52,7 +53,7 @@ export class AccountModule {
       { provide: SETTINGS, inject: [ConfigService], useFactory: (config: ConfigService) => config.get() },
       { provide: ACCOUNT_RESOLVER, inject: [ACCOUNT_POOL, ConfigService], useFactory: (pool: Pool, config: ConfigService) => new AccountService(new PostgresAccountSource(pool), { legacyHmacKey: config.get().secrets.legacyHmacKey, fingerprintKey: config.get().secrets.fingerprint, subjectKey: config.get().secrets.subject }) },
       { provide: REPOSITORY, inject: [OIDC_POOL], useFactory: (pool: Pool) => new AccountRepository(pool) },
-      { provide: ADMIN_SESSION_AUTH, inject: [OIDC_POOL, ConfigService], useFactory: (pool: Pool, config: ConfigService) => new PostgresAdminAuth(pool, config.get()) },
+      { provide: ADMIN_SESSION_AUTH, inject: [OIDC_POOL, ConfigService], useFactory: (pool: Pool, config: ConfigService) => new PostgresAdminAuth(new PostgresAdminRepository(pool), config.get()) },
       ProviderSessionGateway, { provide: PROVIDER_SESSIONS, useExisting: ProviderSessionGateway },
     ];
     return {

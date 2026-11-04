@@ -59,7 +59,7 @@ test('Nest account API preserves anonymous profile and session contracts', async
 });
 
 test('Nest account API exposes administrator bootstrap without session identifiers', async (context) => {
-  const target = await service({ adminAuth: { async authenticated() { return true; } } }); context.after(target.close);
+  const target = await service({ adminAuth: { async authenticated() { return { id: 'admin-id', username: 'ops', mustChangePassword: false }; } } }); context.after(target.close);
   const response = await fetch(target.base + '/api/v1/session');
   assert.equal(response.status, 200);
   const body = await response.json() as { data: { admin: unknown } };

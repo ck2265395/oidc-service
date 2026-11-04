@@ -25,7 +25,7 @@ async function service(applicationOverrides: Partial<ApplicationModuleOptions> =
   const application: ApplicationModuleOptions = { config, developer, applications: apps as never, groups: groups as never, ...applicationOverrides };
   const admin: AdminModuleOptions = {
     config,
-    auth: { async authenticated(request) { return request.headers['x-admin-test'] === 'yes'; }, mutationAllowed() { return true; }, async logout() {} },
+    auth: { async authenticated(request) { return request.headers['x-admin-test'] === 'yes' ? { id: 'admin-id', username: 'ops', mustChangePassword: false } : null; }, mutationAllowed() { return true; }, async logout() {} },
     applications: application.applications, groups: application.groups,
     developers: { async listForAdmin() { return { total: 0, list: [] }; }, async getForAdmin() { return null; }, async reviewDeveloper() { throw new Error('unused'); } } as never,
     audit: { async list(page) { return { page, list: [{ action: 'application.review' }] }; }, async statistics(days) { return { days, list: [] }; }, async overview() { return { applications: {}, groups: {}, recentAudit: [] }; }, async recordDeveloperReview() {} },
