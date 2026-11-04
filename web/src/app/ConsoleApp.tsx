@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
 import { apiGet, consoleMutation, developerMutation } from '../api';
 import { DeveloperDocs } from './DeveloperDocs';
@@ -356,7 +356,7 @@ function ConsoleContent({ kind, active, csrfToken, developerStatus, developerRev
 }
 
 function ConsoleShell({ kind }: { kind: ConsoleKind }) {
-  const location = useLocation(); const copy = consoleCopy[kind];
+  const location = useLocation(); const navigate = useNavigate(); const copy = consoleCopy[kind];
   const active = copy.items.find(([path]) => location.pathname === path)?.[1] ?? copy.label;
   const session = useResource<SessionData>(async () => {
     if (kind !== 'developer') return apiGet<SessionData>('/api/v1/session');
@@ -383,9 +383,16 @@ function ConsoleShell({ kind }: { kind: ConsoleKind }) {
     try { await consoleMutation('/api/v1/admin/logout', 'POST', session.data.csrfToken); window.location.assign('/admin/login'); }
     catch { session.reload(); }
   };
+  const logoutDeveloper = async () => {
+    if (!session.data?.csrfToken) return;
+    try {
+      await consoleMutation('/api/v1/developer-auth/logout', 'POST', session.data.csrfToken);
+      navigate('/');
+    } catch { session.reload(); }
+  };
   const developerStatus = session.data?.developerStatus;
   const statusCopy = developerStatus ? ({ unsubmitted: ['未提交审核', '完善开发者资料后手动提交审核'], pending: ['审核中', '平台管理员正在审核开发者资质'], approved: ['审核通过', '可以创建应用和应用组'], rejected: ['审核已驳回', '请根据审核意见修改资料后重新提交'], disabled: ['账号已禁用', '请联系平台管理员处理'] } as const)[developerStatus] : null;
-  return <div className="console-layout"><aside className="sidebar"><div className="sidebar-brand"><Brand /></div><div className="workspace-label"><span>当前工作区</span><strong>{copy.title}</strong></div><nav className="side-nav" aria-label={copy.label}>{copy.items.map(([path, label], index) => <Link className={location.pathname === path ? 'active' : ''} to={path} key={path}><span>{String(index + 1).padStart(2, '0')}</span>{label}</Link>)}</nav><Link className="sidebar-help" to="/developer/docs">帮助与文档<span>→</span></Link></aside><div className="console-main"><header className="console-header"><div className="breadcrumb">MOONDROP <span>/</span> {copy.label} <span>/</span> <strong>{active}</strong></div><div className="header-actions"><span className="header-user">{session.data?.account?.nickname || session.data?.admin.username || '访客'}</span>{kind === 'admin' && signedIn && <button className="header-logout" type="button" onClick={() => void logoutAdmin()}>退出</button>}<span className="avatar">{(session.data?.account?.nickname || session.data?.admin.username || 'MD').slice(0, 2).toUpperCase()}</span></div></header><main className="workspace"><div className="page-title"><div><span>{copy.label}</span><h1>{active}</h1><p>统一身份平台工作区，所有关键操作均可追踪与审计。</p></div></div>{session.loading ? <Feedback loading error="" /> : !signedIn ? <section className="panel auth-required"><span className="placeholder-icon">↗</span><h2>需要登录后继续</h2><p>{kind === 'admin' ? '请使用平台管理员凭据登录。' : '使用开发者邮箱或水月雨账号登录后继续。'}</p><a className="button primary" href={loginHref}>前往登录</a></section> : <>{kind === 'developer' && statusCopy && <section className={`developer-status-card status-${developerStatus}`}><div><span>开发者状态</span><strong>{statusCopy[0]}</strong><small>{session.data?.developerReview?.reason || statusCopy[1]}</small></div>{developerStatus === 'unsubmitted' && <Link className="button primary" to="/developer/console/profile">完善资料</Link>}</section>}<ConsoleContent kind={kind} active={active} csrfToken={session.data?.csrfToken || ''} developerStatus={developerStatus} /></>}</main></div></div>;
+  return <div className="console-layout"><aside className="sidebar"><div className="sidebar-brand"><Brand /></div><div className="workspace-label"><span>当前工作区</span><strong>{copy.title}</strong></div><nav className="side-nav" aria-label={copy.label}>{copy.items.map(([path, label], index) => <Link className={location.pathname === path ? 'active' : ''} to={path} key={path}><span>{String(index + 1).padStart(2, '0')}</span>{label}</Link>)}</nav><Link className="sidebar-help" to="/developer/docs">帮助与文档<span>→</span></Link></aside><div className="console-main"><header className="console-header"><div className="breadcrumb">MOONDROP <span>/</span> {copy.label} <span>/</span> <strong>{active}</strong></div><div className="header-actions"><span className="header-user">{session.data?.account?.nickname || session.data?.admin.username || '访客'}</span>{kind === 'admin' && signedIn && <button className="header-logout" type="button" onClick={() => void logoutAdmin()}>退出</button>}{kind === 'developer' && signedIn && <button className="header-logout" type="button" onClick={() => void logoutDeveloper()}>退出登录</button>}<span className="avatar">{(session.data?.account?.nickname || session.data?.admin.username || 'MD').slice(0, 2).toUpperCase()}</span></div></header><main className="workspace"><div className="page-title"><div><span>{copy.label}</span><h1>{active}</h1><p>统一身份平台工作区，所有关键操作均可追踪与审计。</p></div></div>{session.loading ? <Feedback loading error="" /> : !signedIn ? <section className="panel auth-required"><span className="placeholder-icon">↗</span><h2>需要登录后继续</h2><p>{kind === 'admin' ? '请使用平台管理员凭据登录。' : '使用开发者邮箱或水月雨账号登录后继续。'}</p><a className="button primary" href={loginHref}>前往登录</a></section> : <>{kind === 'developer' && statusCopy && <section className={`developer-status-card status-${developerStatus}`}><div><span>开发者状态</span><strong>{statusCopy[0]}</strong><small>{session.data?.developerReview?.reason || statusCopy[1]}</small></div>{developerStatus === 'unsubmitted' && <Link className="button primary" to="/developer/console/profile">完善资料</Link>}</section>}<ConsoleContent kind={kind} active={active} csrfToken={session.data?.csrfToken || ''} developerStatus={developerStatus} /></>}</main></div></div>;
 }
 
 export function ConsoleApp() {

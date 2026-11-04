@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { ConsoleApp } from './ConsoleApp';
@@ -36,14 +36,18 @@ test('shows live developer overview data for the signed-in account', async () =>
     },
     '/api/v1/developer/groups?page=1&pageSize=100': { total: 1, list: [] },
   };
-  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+  const fetch = vi.fn(async (input: RequestInfo | URL) => {
     const raw = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     const parsed = new URL(raw, 'http://localhost');
+    if (parsed.pathname === '/api/v1/developer-auth/logout') {
+      return new Response(JSON.stringify({ code: 0, desc: 'ok', data: null }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
     const data = responses[parsed.pathname + parsed.search];
     return new Response(JSON.stringify({ code: 0, desc: 'ok', data }), {
       status: data ? 200 : 404, headers: { 'content-type': 'application/json' },
     });
-  }));
+  });
+  vi.stubGlobal('fetch', fetch);
 
   render(<ConsoleApp />);
 
@@ -51,4 +55,10 @@ test('shows live developer overview data for the signed-in account', async () =>
   expect(screen.getByText('2')).toBeInTheDocument();
   expect(screen.getByText('Portal')).toBeInTheDocument();
   expect(screen.getAllByText('待审核')).toHaveLength(2);
+  fireEvent.click(screen.getByRole('button', { name: '退出登录' }));
+  await waitFor(() => expect(window.location.pathname).toBe('/'));
+  expect(fetch).toHaveBeenCalledWith('/api/v1/developer-auth/logout', expect.objectContaining({
+    method: 'POST',
+    headers: expect.objectContaining({ 'x-csrf-token': 'console-token' }),
+  }));
 });
