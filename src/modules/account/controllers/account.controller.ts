@@ -3,14 +3,16 @@ import type { Request, Response } from 'express';
 
 import { consoleMutationAllowed } from '../../../common/security/http-security.js';
 import { AccountApplicationService } from '../application/account.service.js';
+import type { ProviderSessionPort } from '../account.module.js';
+import { PROVIDER_SESSIONS } from '../account.tokens.js';
 
 @Controller('api/v1/account')
 export class AccountController {
-  constructor(@Inject(AccountApplicationService) private readonly accounts: AccountApplicationService) {}
+  constructor(@Inject(AccountApplicationService) private readonly accounts: AccountApplicationService, @Inject(PROVIDER_SESSIONS) private readonly sessions: ProviderSessionPort) {}
 
   @Get('authorizations')
   async list(@Req() request: Request, @Res() response: Response): Promise<void> {
-    const accountId = await this.accounts.accountId(request, response);
+    const accountId = await this.sessions.accountId(request, response).catch(() => null);
     if (!accountId) { response.status(401).json({ code: 'authentication_required', desc: 'Sign in is required', data: null }); return; }
     try { response.json({ code: 0, desc: 'ok', data: await this.accounts.listAuthorizations(accountId) }); }
     catch { response.status(503).json({ code: 'storage_unavailable', desc: 'Authorization data is unavailable', data: null }); }
@@ -19,7 +21,7 @@ export class AccountController {
   @Delete('authorizations/:id')
   async revoke(@Param('id') id: string, @Req() request: Request, @Res() response: Response): Promise<void> {
     if (!consoleMutationAllowed(request, this.accounts.settings.issuer)) { response.status(403).json({ code: 'csrf_denied', desc: 'Request verification failed', data: null }); return; }
-    const accountId = await this.accounts.accountId(request, response);
+    const accountId = await this.sessions.accountId(request, response).catch(() => null);
     if (!accountId) { response.status(401).json({ code: 'authentication_required', desc: 'Sign in is required', data: null }); return; }
     try {
       if (!await this.accounts.revokeAuthorization(id, accountId)) { response.status(404).json({ code: 'not_found', desc: 'Authorization not found', data: null }); return; }

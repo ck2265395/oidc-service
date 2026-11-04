@@ -1,6 +1,7 @@
 import { Provider, type AdapterFactory, type Configuration, type JWKS } from 'oidc-provider';
 
-import { AccountService, claimsForScopes } from '../../account/domain/accounts.js';
+import type { AccountService } from '../../account/application/account-identity.service.js';
+import { claimsForScopes } from '../../account/domain/accounts.js';
 import type { ApplicationService } from '../../application/application/application-management.service.js';
 
 const ACCOUNT_ID_SEPARATOR = '.';

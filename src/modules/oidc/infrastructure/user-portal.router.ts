@@ -5,7 +5,8 @@ import type Provider from 'oidc-provider';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { Pool } from 'pg';
 
-import { AccountService, safeProfilePictureUrl } from '../../account/domain/accounts.js';
+import type { AccountService } from '../../account/application/account-identity.service.js';
+import { safeProfilePictureUrl } from '../../account/domain/accounts.js';
 import type { ServiceConfig } from '../../../infrastructure/config/config.schema.js';
 import { escapeHtml } from '../../../common/security/security.js';
 import { PORTAL_CLIENT_ID } from './provider.factory.js';

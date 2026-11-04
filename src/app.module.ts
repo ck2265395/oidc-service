@@ -1,4 +1,4 @@
-import { type DynamicModule, Module } from '@nestjs/common';
+import { type DynamicModule, Module, type Type } from '@nestjs/common';
 
 import { ConfigModule } from './infrastructure/config/config.module.js';
 import { ConfigService } from './infrastructure/config/config.service.js';
@@ -17,6 +17,23 @@ import { OidcModule } from './modules/oidc/oidc.module.js';
 @Module({})
 export class AppModule {
   static register(config: ConfigService, infrastructure = false): DynamicModule {
-    return { module: AppModule, imports: [ConfigModule.register(config), ...(infrastructure ? [DatabaseModule, RedisModule, EmailModule, SigningKeyModule, AccountModule.register(), DeveloperModule.registerProduction(), ApplicationModule.registerProduction(), AdminModule.registerProduction(), OidcModule.registerProduction()] : []), HealthModule, WebModule] };
+    const productionModules: Array<DynamicModule | Type<unknown>> = [];
+    if (infrastructure) {
+      const account = AccountModule.register();
+      const developer = DeveloperModule.registerProduction(account);
+      const application = ApplicationModule.registerProduction(developer);
+      productionModules.push(
+        DatabaseModule,
+        RedisModule,
+        EmailModule,
+        SigningKeyModule,
+        account,
+        developer,
+        application,
+        AdminModule.registerProduction(application, developer),
+        OidcModule.registerProduction(account, application, developer),
+      );
+    }
+    return { module: AppModule, imports: [ConfigModule.register(config), ...productionModules, HealthModule, WebModule] };
   }
 }

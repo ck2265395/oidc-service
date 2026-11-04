@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import type { Request, Response } from 'express';
 
 import type { AccountIdentity } from '../domain/accounts.js';
 import { safeProfilePictureUrl } from '../domain/accounts.js';
@@ -9,8 +8,7 @@ export interface AccountResolutionPort {
   resolve(uuid: string, fingerprint: string, sector?: string): Promise<AccountIdentity | null>;
 }
 
-export interface ProviderSessionPort {
-  accountId(request: Request, response: Response): Promise<string | null>;
+export interface ProviderGrantPort {
   revokeGrant(id: string, accountId: string): Promise<{ clientId: string | null } | null>;
 }
 
@@ -22,7 +20,6 @@ export interface AccountRepositoryPort {
   listAuthorizations(accountId: string): Promise<AuthorizationView[]>;
   authorizationOwned(id: string, accountId: string): Promise<boolean>;
   recordRevocation(uuid: string, clientId: string | null): Promise<void>;
-  adminAuthenticated(request: Request): Promise<boolean>;
 }
 
 function maskedEmail(value: string | null): string | null {
@@ -36,16 +33,11 @@ export class AccountApplicationService {
   constructor(
     private readonly resolver: AccountResolutionPort,
     private readonly repository: AccountRepositoryPort,
-    private readonly sessions: ProviderSessionPort,
+    private readonly sessions: ProviderGrantPort,
     private readonly config: ServiceConfig,
   ) {}
 
-  async accountId(request: Request, response: Response): Promise<string | null> {
-    try { return await this.sessions.accountId(request, response); } catch { return null; }
-  }
-
-  async identity(request: Request, response: Response, sector: string): Promise<AccountIdentity | null> {
-    const accountId = await this.accountId(request, response);
+  async identity(accountId: string | null, sector: string): Promise<AccountIdentity | null> {
     if (!accountId) return null;
     const separator = accountId.lastIndexOf('.');
     if (separator < 1) return null;
@@ -73,6 +65,5 @@ export class AccountApplicationService {
     return true;
   }
 
-  adminAuthenticated(request: Request): Promise<boolean> { return this.repository.adminAuthenticated(request); }
   get settings(): ServiceConfig { return this.config; }
 }

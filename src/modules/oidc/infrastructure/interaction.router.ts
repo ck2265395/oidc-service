@@ -3,9 +3,11 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import express, { type Request, type Response, Router } from 'express';
 import type Provider from 'oidc-provider';
 
-import { AccountService, type LoginType } from '../../account/domain/accounts.js';
+import type { AccountService } from '../../account/application/account-identity.service.js';
+import type { LoginType } from '../../account/domain/accounts.js';
 import { accountHandle, PORTAL_CLIENT_ID } from './provider.factory.js';
 import type { ApplicationService } from '../../application/application/application-management.service.js';
+import type { DeveloperService } from '../../developer/developer.service.js';
 import { LoginRateLimitError, type RedisLoginRateLimiter } from './login-rate-limiter.js';
 import { escapeHtml } from '../../../common/security/security.js';
 
@@ -101,6 +103,7 @@ export function createInteractionRouter(
   provider: Provider,
   accounts: AccountService,
   applications: ApplicationService,
+  developers: Pick<DeveloperService, 'profile'>,
   csrfKey: string,
   secureCookies: boolean,
   rateLimiter: RedisLoginRateLimiter,
@@ -141,7 +144,7 @@ export function createInteractionRouter(
         const scopes = requestedScopes(details.params.scope, active?.config.scopes ?? ['openid', 'profile', 'email']);
         if (!scopes) return errorPage(response);
         const developer = active
-          ? await applications.getDeveloperProfile(active.record.ownerUuid)
+          ? await developers.profile(active.record.ownerUuid)
           : { displayName: 'MOONDROP' };
         if (!developer) return errorPage(response);
         const scopeNames: Record<string, string> = {

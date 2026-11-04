@@ -1,7 +1,7 @@
 import { Global, Inject, Injectable, Module, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
 import type { Pool } from 'pg';
 
-import { createAccountPool } from '../../modules/account/domain/accounts.js';
+import { createAccountPool } from '../../modules/account/infrastructure/postgres-account.source.js';
 import { ACCOUNT_POOL, OIDC_POOL } from '../../common/tokens/injection-tokens.js';
 import { createPlatformPool } from '../../modules/application/infrastructure/application.store.js';
 import { ConfigService } from '../config/config.service.js';

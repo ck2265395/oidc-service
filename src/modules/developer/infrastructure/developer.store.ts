@@ -317,6 +317,14 @@ export class PostgresDeveloperStore {
     return mapProfile(row);
   }
 
+  async verifyContactEmail(developerId: string, contactEmail: string): Promise<boolean> {
+    const result = await this.pool.query(
+      'UPDATE developer_profile SET contact_email_verified = true, updated_at = now() WHERE developer_id = $1 AND contact_email = $2',
+      [developerId, contactEmail],
+    );
+    return result.rowCount === 1;
+  }
+
   async listReviewHistory(developerId: string): Promise<unknown[]> {
     const result = await this.pool.query(
       'SELECT action, from_status, to_status, reviewer_id, reason, profile_snapshot, revision, created_at FROM developer_review_history WHERE developer_id = $1 ORDER BY created_at DESC, id DESC',

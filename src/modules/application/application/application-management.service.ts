@@ -15,14 +15,6 @@ export interface ReviewRecord {
   reviewedAt: string;
 }
 
-export interface DeveloperProfileRecord {
-  accountUuid: string;
-  displayName: string;
-  contactEmail: string;
-  contactEmailVerified: boolean;
-  revision: number;
-}
-
 export interface ApplicationRecord {
   id: string;
   ownerUuid: string;
@@ -185,58 +177,11 @@ export class ApplicationService {
     private readonly makeClientSecret: () => string = () => randomToken(48),
   ) {}
 
-  private clearClientCache: (clientId: string) => void = () => {};
+  private clearClientCache: ((clientId: string) => void) | null = null;
 
   setClientCacheClearer(clear: (clientId: string) => void): void {
+    if (this.clearClientCache) throw new Error('Client cache clearer is already attached');
     this.clearClientCache = clear;
-  }
-
-  async getDeveloperProfile(accountUuid: string): Promise<DeveloperProfileRecord | null> {
-    if (!this.repository.getDeveloperProfile) throw new ApplicationConflictError('Developer profile storage is unavailable');
-    return this.repository.getDeveloperProfile(accountUuid);
-  }
-
-  async verifyDeveloperEmail(accountUuid: string, contactEmail: string): Promise<boolean> {
-    if (!this.repository.verifyDeveloperEmail) throw new ApplicationConflictError('Developer email verification storage is unavailable');
-    return this.repository.verifyDeveloperEmail(accountUuid, contactEmail);
-  }
-
-  async saveDeveloperProfile(
-    accountUuid: string,
-    input: unknown,
-    expectedRevision: number,
-  ): Promise<DeveloperProfileRecord> {
-    if (!accountUuid || accountUuid.length > 255 || !this.repository.saveDeveloperProfile) {
-      throw new ApplicationConflictError('Developer profile storage is unavailable');
-    }
-    if (typeof input !== 'object' || input === null || Array.isArray(input)) {
-      throw new ApplicationConflictError('Developer profile is invalid');
-    }
-    const value = input as Record<string, unknown>;
-    const displayName = value.displayName;
-    const contactEmail = value.contactEmail;
-    if (
-      typeof displayName !== 'string' ||
-      displayName.trim() !== displayName ||
-      displayName.length < 1 ||
-      displayName.length > 100 ||
-      typeof contactEmail !== 'string' ||
-      contactEmail.trim() !== contactEmail ||
-      contactEmail.length > 254 ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail) ||
-      !Number.isSafeInteger(expectedRevision) ||
-      expectedRevision < 0
-    ) {
-      throw new ApplicationConflictError('Developer profile fields or revision are invalid');
-    }
-    const saved = await this.repository.saveDeveloperProfile(
-      accountUuid,
-      displayName,
-      contactEmail,
-      expectedRevision,
-    );
-    if (!saved) throw new ApplicationConflictError();
-    return saved;
   }
 
   async create(ownerUuid: string, type: ClientType, input: unknown): Promise<ApplicationRecord> {
@@ -312,7 +257,7 @@ export class ApplicationService {
       nextEnvelope,
     );
     if (!updated) throw new ApplicationConflictError();
-    this.clearClientCache(current.clientId);
+    this.clearClientCache?.(current.clientId);
     return { clientSecret };
   }
 
@@ -367,7 +312,7 @@ export class ApplicationService {
     const next = reviewApplication(current, expectedRevision, command);
     const saved = await this.repository.compareAndSwap(current, next, next.lastReview);
     if (!saved) throw new ApplicationConflictError();
-    this.clearClientCache(current.clientId);
+    this.clearClientCache?.(current.clientId);
     return next;
   }
 

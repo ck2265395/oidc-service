@@ -13,6 +13,7 @@ import { createProvider, PORTAL_CLIENT_ID } from '../src/modules/oidc/infrastruc
 import { mountProtocolMiddleware } from '../src/modules/oidc/oidc-protocol.middleware.js';
 import { DeveloperModule } from '../src/modules/developer/developer.module.js';
 import { DeveloperService } from '../src/modules/developer/developer.service.js';
+import { AccountModule } from '../src/modules/account/account.module.js';
 
 const values = new Map<string, AdapterPayload>();
 class MemoryAdapter implements Adapter {
@@ -53,8 +54,10 @@ test('Nest OIDC contract preserves native discovery, JWKS, redirects, and middle
   assert.notEqual(token.status, 404); assert.match(token.headers.get('content-type') ?? '', /json/);
 });
 
-test('production developer services are exported globally for application composition', () => {
-  const module = DeveloperModule.registerProduction();
-  assert.equal(module.global, true);
+test('production developer services use explicit module composition', () => {
+  const account = AccountModule.register();
+  const module = DeveloperModule.registerProduction(account);
+  assert.equal(module.global, undefined);
+  assert.ok(module.imports?.includes(account));
   assert.ok(module.exports?.includes(DeveloperService));
 });

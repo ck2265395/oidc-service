@@ -6,7 +6,7 @@ import express from 'express';
 import type Provider from 'oidc-provider';
 import type { Pool } from 'pg';
 
-import type { AccountService } from '../src/modules/account/domain/accounts.js';
+import type { AccountService } from '../src/modules/account/application/account-identity.service.js';
 import type { ServiceConfig } from '../src/infrastructure/config/config.schema.js';
 import { createUserPortalRouter } from '../src/modules/oidc/infrastructure/user-portal.router.js';
 

@@ -3,7 +3,12 @@ import { createHash, randomBytes } from 'node:crypto';
 import nodemailer from 'nodemailer';
 import type { RedisClientType } from 'redis';
 
-import type { ApplicationService } from '../../application/application/application-management.service.js';
+import type { DeveloperProfile } from '../domain/developer-identity.js';
+
+interface DeveloperProfileVerificationStore {
+  getProfile(developerId: string): Promise<DeveloperProfile | null>;
+  verifyContactEmail(developerId: string, contactEmail: string): Promise<boolean>;
+}
 
 interface VerificationPayload {
   accountUuid: string;
@@ -28,13 +33,13 @@ function rateLimitKey(accountUuid: string): string {
 export class DeveloperEmailVerification {
   constructor(
     private readonly redis: RedisClientType,
-    private readonly applications: ApplicationService,
+    private readonly profiles: DeveloperProfileVerificationStore,
     private readonly issuer: string,
     private readonly sendMail: (to: string, link: string) => Promise<void>,
   ) {}
 
   async request(accountUuid: string): Promise<'sent' | 'already_verified'> {
-    const profile = await this.applications.getDeveloperProfile(accountUuid);
+    const profile = await this.profiles.getProfile(accountUuid);
     if (!profile) throw new EmailVerificationError('Register a developer profile first');
     if (profile.contactEmailVerified) return 'already_verified';
 
@@ -44,7 +49,7 @@ export class DeveloperEmailVerification {
 
     const token = randomBytes(32).toString('base64url');
     const payload: VerificationPayload = {
-      accountUuid: profile.accountUuid,
+      accountUuid: profile.developerId,
       contactEmail: profile.contactEmail,
     };
     const tokenKey = verificationKey(token);
@@ -77,7 +82,7 @@ export class DeveloperEmailVerification {
     ) return false;
     const value = payload as VerificationPayload;
     if (value.accountUuid.length < 1 || value.accountUuid.length > 255 || value.contactEmail.length > 254) return false;
-    return this.applications.verifyDeveloperEmail(value.accountUuid, value.contactEmail);
+    return this.profiles.verifyContactEmail(value.accountUuid, value.contactEmail);
   }
 }
 

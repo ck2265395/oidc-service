@@ -15,9 +15,8 @@ import { testServiceConfig } from './fixtures/service-config.js';
 
 async function service(applicationOverrides: Partial<ApplicationModuleOptions> = {}, adminOverrides: Partial<AdminModuleOptions> = {}) {
   const config = testServiceConfig();
-  const developer = { async authenticated() { return { id: 'dev-approved', status: 'approved' as const }; }, writeAllowed() { return true as const; } };
+  const developer = { async authenticated() { return { id: 'dev-approved', status: 'approved' as const }; }, writeAllowed() { return true as const; }, async profile() { return { displayName: 'Developer' }; } };
   const apps = {
-    async getDeveloperProfile() { return { accountUuid: 'dev-approved' }; },
     async createWithSecret() { return { record: { id: 'app-1', clientId: 'client-1', type: 'web', revision: 1, status: 'draft', draft: { name: 'App' }, approvedConfig: null, approvedRevision: null, lastReview: null }, clientSecret: 'one-time-secret' }; },
     async listOwned() { return { total: 0, list: [] }; }, async getOwned() { return null; }, async edit() { return null; }, async submit() { return null; }, async rotateClientSecret() { return null; },
     async listForAdmin() { return { total: 0, list: [] }; }, async getForAdmin() { return null; }, async review() { throw new ApplicationConflictError('revision changed'); },
@@ -40,7 +39,8 @@ async function service(applicationOverrides: Partial<ApplicationModuleOptions> =
   return { base: `http://127.0.0.1:${address.port}`, close: () => app.close() };
 }
 
-const writeHeaders = { origin: 'https://identity.example.test', 'content-type': 'application/json' };
+const csrf = 'a'.repeat(43);
+const writeHeaders = { origin: 'https://identity.example.test', 'content-type': 'application/json', cookie: `__Host-dt-api-csrf=${csrf}`, 'x-csrf-token': csrf };
 
 test('Nest application and admin API gates creation and returns a client secret once', async (context) => {
   const target = await service(); context.after(target.close);

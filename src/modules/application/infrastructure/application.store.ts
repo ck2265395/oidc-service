@@ -10,7 +10,6 @@ import {
 import {
   ApplicationConflictError,
   type ApplicationRecord,
-  type DeveloperProfileRecord,
   type ApplicationStatus,
   type ReviewRecord,
 } from '../application/application-management.service.js';
@@ -28,14 +27,6 @@ export interface ApplicationPage {
 }
 
 export interface ApplicationRepository {
-  getDeveloperProfile?(accountUuid: string): Promise<DeveloperProfileRecord | null>;
-  saveDeveloperProfile?(
-    accountUuid: string,
-    displayName: string,
-    contactEmail: string,
-    expectedRevision: number,
-  ): Promise<DeveloperProfileRecord | null>;
-  verifyDeveloperEmail?(accountUuid: string, contactEmail: string): Promise<boolean>;
   createApplication(record: ApplicationRecord, encryptedClientSecret?: string | null): Promise<void>;
   getEncryptedClientSecret?(clientId: string): Promise<string | null>;
   rotateEncryptedClientSecret?(
@@ -245,84 +236,6 @@ export class PostgresApplicationRepository implements ApplicationRepository, App
     private readonly pool: Pool,
     private readonly environment: RuntimeEnvironment,
   ) {}
-
-  async getDeveloperProfile(accountUuid: string): Promise<DeveloperProfileRecord | null> {
-    try {
-      const result = await this.pool.query<{
-        account_uuid: string;
-        display_name: string;
-        contact_email: string;
-        contact_email_verified: boolean;
-        revision: string | number;
-      }>(
-        'SELECT account_uuid, display_name, contact_email, contact_email_verified, revision FROM developer_profile WHERE account_uuid = $1 LIMIT 1',
-        [accountUuid],
-      );
-      const row = result.rows[0];
-      return row ? {
-        accountUuid: row.account_uuid,
-        displayName: row.display_name,
-        contactEmail: row.contact_email,
-        contactEmailVerified: row.contact_email_verified,
-        revision: Number(row.revision),
-      } : null;
-    } catch {
-      throw new PlatformStorageError();
-    }
-  }
-
-  async verifyDeveloperEmail(accountUuid: string, contactEmail: string): Promise<boolean> {
-    try {
-      const result = await this.pool.query(
-        'UPDATE developer_profile SET contact_email_verified = true, updated_at = now() WHERE account_uuid = $1 AND contact_email = $2 AND contact_email_verified = false',
-        [accountUuid, contactEmail],
-      );
-      return result.rowCount === 1;
-    } catch {
-      throw new PlatformStorageError();
-    }
-  }
-
-  async saveDeveloperProfile(
-    accountUuid: string,
-    displayName: string,
-    contactEmail: string,
-    expectedRevision: number,
-  ): Promise<DeveloperProfileRecord | null> {
-    try {
-      const result = expectedRevision === 0
-        ? await this.pool.query<{
-            account_uuid: string;
-            display_name: string;
-            contact_email: string;
-            contact_email_verified: boolean;
-            revision: string | number;
-          }>(
-            'INSERT INTO developer_profile (account_uuid, display_name, contact_email, contact_email_verified, revision) VALUES ($1, $2, $3, false, 1) ON CONFLICT (account_uuid) DO NOTHING RETURNING account_uuid, display_name, contact_email, contact_email_verified, revision',
-            [accountUuid, displayName, contactEmail],
-          )
-        : await this.pool.query<{
-            account_uuid: string;
-            display_name: string;
-            contact_email: string;
-            contact_email_verified: boolean;
-            revision: string | number;
-          }>(
-            'UPDATE developer_profile SET display_name = $2, contact_email_verified = CASE WHEN contact_email = $3 THEN contact_email_verified ELSE false END, contact_email = $3, revision = revision + 1, updated_at = now() WHERE account_uuid = $1 AND revision = $4 RETURNING account_uuid, display_name, contact_email, contact_email_verified, revision',
-            [accountUuid, displayName, contactEmail, expectedRevision],
-          );
-      const row = result.rows[0];
-      return row ? {
-        accountUuid: row.account_uuid,
-        displayName: row.display_name,
-        contactEmail: row.contact_email,
-        contactEmailVerified: row.contact_email_verified,
-        revision: Number(row.revision),
-      } : null;
-    } catch {
-      throw new PlatformStorageError();
-    }
-  }
 
   async createApplication(record: ApplicationRecord, encryptedClientSecret: string | null = null): Promise<void> {
     try {

@@ -4,7 +4,7 @@ import type Provider from 'oidc-provider';
 import type { Pool } from 'pg';
 import type { RedisClientType } from 'redis';
 
-import type { AccountService } from '../account/domain/accounts.js';
+import type { AccountService } from '../account/application/account-identity.service.js';
 import { createOidcAdapterFactory } from './infrastructure/postgres-oidc.adapter.js';
 import type { ServiceConfig } from '../../infrastructure/config/config.schema.js';
 import { createInteractionRouter } from './infrastructure/interaction.router.js';
@@ -13,11 +13,11 @@ import type { ApplicationService } from '../application/application/application-
 import { createProvider } from './infrastructure/provider.factory.js';
 import { createUserPortalRouter } from './infrastructure/user-portal.router.js';
 import type { SigningKeyService } from '../../infrastructure/keys/signing-key.service.js';
-import type { ProviderSessionGateway } from '../account/account.module.js';
-import type { ProviderSessionPort } from '../account/application/account.service.js';
+import type { ProviderSessionGateway, ProviderSessionPort } from '../account/account.module.js';
 import { mountProtocolMiddleware } from './oidc-protocol.middleware.js';
 import { isProtocolPath } from './oidc-protocol.middleware.js';
 import type { OidcAuditService } from './oidc-audit.service.js';
+import type { DeveloperService } from '../developer/developer.service.js';
 
 const CACHE_INVALIDATION_CHANNEL = 'dt:oidc:client-cache-clear';
 
@@ -73,6 +73,7 @@ export class OidcProviderService implements OnModuleInit {
     private readonly keys: SigningKeyService,
     private readonly gateway: ProviderSessionGateway,
     private readonly audit: OidcAuditService,
+    private readonly developers: Pick<DeveloperService, 'profile'>,
   ) {}
 
   async initialize(): Promise<void> {
@@ -80,7 +81,7 @@ export class OidcProviderService implements OnModuleInit {
     await this.keys.onModuleInit();
     const provider = createProvider(this.config.issuer, createOidcAdapterFactory(this.pool, this.applications, this.redis), this.accounts, this.applications, this.config.secrets.cookie, this.keys.get());
     const limiter = new RedisLoginRateLimiter(this.redis, this.config.secrets.fingerprint, this.config.loginRateLimit.windowSeconds, this.config.loginRateLimit.accountAttempts, this.config.loginRateLimit.ipAttempts);
-    this.interactionRouter = createInteractionRouter(provider, this.accounts, this.applications, this.config.secrets.cookie, this.config.issuer.startsWith('https:'), limiter, this.config.accountPortal);
+    this.interactionRouter = createInteractionRouter(provider, this.accounts, this.applications, this.developers, this.config.secrets.cookie, this.config.issuer.startsWith('https:'), limiter, this.config.accountPortal);
     this.portalRouter = createUserPortalRouter(this.pool, provider, this.accounts, this.config, this.redis);
     const port: ProviderSessionPort = {
       accountId: async (request, response) => { const session = await provider.Session.get(provider.createContext(request, response)); return typeof session.accountId === 'string' ? session.accountId : null; },

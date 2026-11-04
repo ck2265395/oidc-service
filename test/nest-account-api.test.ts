@@ -17,7 +17,6 @@ async function service(options: Partial<AccountModuleOptions> = {}) {
     async listAuthorizations(accountId: string) { return accountId.startsWith('user-1.') ? authorizations : []; },
     async authorizationOwned(id: string, accountId: string) { return id === 'grant-1' && accountId.startsWith('user-1.'); },
     async recordRevocation() { return; },
-    async adminAuthenticated() { return false; },
   };
   const sessions = {
     async accountId() { return 'user-1.' + 'a'.repeat(43); },
@@ -60,9 +59,7 @@ test('Nest account API preserves anonymous profile and session contracts', async
 });
 
 test('Nest account API exposes administrator bootstrap without session identifiers', async (context) => {
-  const target = await service({ repository: {
-    async listAuthorizations() { return []; }, async authorizationOwned() { return false; }, async recordRevocation() {}, async adminAuthenticated() { return true; },
-  } }); context.after(target.close);
+  const target = await service({ adminAuth: { async authenticated() { return true; } } }); context.after(target.close);
   const response = await fetch(target.base + '/api/v1/session');
   assert.equal(response.status, 200);
   const body = await response.json() as { data: { admin: unknown } };

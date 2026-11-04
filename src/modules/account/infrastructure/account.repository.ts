@@ -1,14 +1,9 @@
-import { createHash } from 'node:crypto';
-
-import type { Request } from 'express';
 import type { Pool } from 'pg';
 
-import { readCookie } from '../../../common/security/http-security.js';
-import type { ServiceConfig } from '../../../infrastructure/config/config.schema.js';
 import type { AccountRepositoryPort, AuthorizationView } from '../application/account.service.js';
 
 export class AccountRepository implements AccountRepositoryPort {
-  constructor(private readonly pool: Pool, private readonly config: ServiceConfig) {}
+  constructor(private readonly pool: Pool) {}
 
   async listAuthorizations(accountId: string): Promise<AuthorizationView[]> {
     const result = await this.pool.query<{
@@ -41,12 +36,4 @@ export class AccountRepository implements AccountRepositoryPort {
     );
   }
 
-  async adminAuthenticated(request: Request): Promise<boolean> {
-    const secure = this.config.issuer.startsWith('https:');
-    const token = readCookie(request, secure ? '__Host-dt-admin' : 'dt-admin');
-    if (!token || token.length > 128) return false;
-    const digest = createHash('sha256').update(token, 'utf8').digest('hex');
-    const result = await this.pool.query("UPDATE admin_session SET last_activity = now() WHERE session_hash = $1 AND created_at > now() - interval '8 hours' AND last_activity > now() - interval '30 minutes' RETURNING session_hash", [digest]);
-    return result.rowCount === 1;
-  }
 }

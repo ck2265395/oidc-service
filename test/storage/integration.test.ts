@@ -32,10 +32,6 @@ test('PostgreSQL repositories and Redis security controls work across connection
     await pool.query(await readFile(new URL('../../sql/postgre.sql', import.meta.url), 'utf8'));
 
     const repository = new PostgresApplicationRepository(pool, 'development');
-    const profile = await repository.saveDeveloperProfile(ownerUuid, 'Storage Example', 'storage@example.invalid', 0);
-    assert.equal(profile?.revision, 1);
-    assert.equal(profile?.contactEmailVerified, false);
-
     const groups = new ApplicationGroupService(repository, () => groupId);
     const group = await groups.create(ownerUuid, 'Integration Group');
     assert.equal((await groups.listOwned(ownerUuid)).list[0]?.id, groupId);

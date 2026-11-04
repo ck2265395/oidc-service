@@ -3,18 +3,25 @@ import type { Request, Response } from 'express';
 
 import { setConsoleCsrf } from '../../../common/security/http-security.js';
 import { AccountApplicationService } from '../application/account.service.js';
+import type { ProviderSessionPort } from '../account.module.js';
+import { ADMIN_SESSION_AUTH, PROVIDER_SESSIONS } from '../account.tokens.js';
+import type { AdminAuthPort } from '../../admin/infrastructure/admin-auth.js';
 
 @Controller('api/v1/session')
 export class SessionController {
-  constructor(@Inject(AccountApplicationService) private readonly accounts: AccountApplicationService) {}
+  constructor(
+    @Inject(AccountApplicationService) private readonly accounts: AccountApplicationService,
+    @Inject(ADMIN_SESSION_AUTH) private readonly adminAuth: Pick<AdminAuthPort, 'authenticated'>,
+    @Inject(PROVIDER_SESSIONS) private readonly sessions: ProviderSessionPort,
+  ) {}
   @Get()
   async get(@Req() request: Request, @Res() response: Response): Promise<void> {
     let account: Record<string, unknown> | null = null;
     try {
-      const identity = await this.accounts.identity(request, response, 'console-bootstrap');
+      const identity = await this.accounts.identity(await this.sessions.accountId(request, response), 'console-bootstrap');
       if (identity) account = this.accounts.accountSummary(identity);
     } catch { account = null; }
-    const authenticated = await this.accounts.adminAuthenticated(request).catch(() => false);
+    const authenticated = await this.adminAuth.authenticated(request).catch(() => false);
     const secure = this.accounts.settings.issuer.startsWith('https:');
     response.json({ code: 0, desc: 'ok', data: {
       account, admin: authenticated ? { authenticated: true, username: this.accounts.settings.admin.username } : { authenticated: false },

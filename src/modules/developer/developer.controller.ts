@@ -5,6 +5,7 @@ import { DeveloperReviewError } from './infrastructure/developer.store.js';
 import { EmailVerificationError } from './application/email-verification.service.js';
 import { randomToken } from '../../common/security/security.js';
 import { DeveloperService } from './developer.service.js';
+import { developerCookie, developerWriteAllowed, setDeveloperSession } from './infrastructure/developer-http.js';
 
 function jsonError(response: Response, status: number, code: string, desc: string): void { response.status(status).json({ code, desc, data: null }); }
 function record(value: unknown): Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
@@ -14,12 +15,12 @@ export class DeveloperController {
   constructor(@Inject(DeveloperService) private readonly service: DeveloperService) {}
 
   private write(request: Request, response: Response): boolean {
-    const allowed = this.service.writeAllowed(request);
+    const allowed = developerWriteAllowed(request, this.service.config.issuer);
     if (allowed === true) return true;
     jsonError(response, 403, allowed === 'origin' ? 'origin_denied' : 'csrf_denied', allowed === 'origin' ? 'Request origin is not allowed' : 'Request verification failed'); return false;
   }
   private async owner(request: Request, response: Response): Promise<string | null> {
-    const developer = await this.service.authenticated(request);
+    const developer = await this.service.authenticated(developerCookie(request, 'md-developer'));
     if (!developer) { jsonError(response, 401, 'authentication_required', 'Sign in is required'); return null; }
     return developer.id;
   }
@@ -127,7 +128,7 @@ export class DeveloperController {
     try {
       const existing = await this.service.store.findByExternalIdentity('moondrop', subject);
       const account = existing ?? await this.service.store.createExternalAccount('moondrop', subject);
-      await this.service.establish(response, account.id);
+      setDeveloperSession(response, await this.service.establish(account.id), this.service.config.issuer.startsWith('https:'));
       response.status(existing ? 200 : 201).json({ code: 0, desc: 'ok', data: account });
     } catch { jsonError(response, 409, 'identity_conflict', 'MOONDROP account is already bound'); }
   }
@@ -142,7 +143,7 @@ export class DeveloperController {
     try {
       const developerId = await this.service.login(String(input.email ?? ''), String(input.password ?? ''));
       await this.service.store.bindExternalIdentity(developerId, 'moondrop', subject);
-      await this.service.establish(response, developerId);
+      setDeveloperSession(response, await this.service.establish(developerId), this.service.config.issuer.startsWith('https:'));
       response.json({ code: 0, desc: 'ok', data: { developerId } });
     } catch { jsonError(response, 401, 'binding_failed', 'Developer credentials are invalid or the account is already bound'); }
   }
