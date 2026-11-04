@@ -116,14 +116,28 @@ CREATE INDEX IF NOT EXISTS platform_audit_created_idx
 CREATE INDEX IF NOT EXISTS platform_audit_app_created_idx
   ON platform_audit (application_id, created_at DESC, id DESC);
 
+CREATE TABLE IF NOT EXISTS platform_admin (
+  id uuid PRIMARY KEY,
+  username text NOT NULL CHECK (char_length(username) BETWEEN 1 AND 128),
+  username_normalized text NOT NULL UNIQUE CHECK (username_normalized = lower(btrim(username_normalized))),
+  password_hash text NOT NULL,
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
+  must_change_password boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS admin_session (
   session_hash text PRIMARY KEY CHECK (session_hash ~ '^[a-f0-9]{64}$'),
+  admin_id uuid REFERENCES platform_admin(id) ON DELETE CASCADE,
   created_at timestamptz NOT NULL DEFAULT now(),
   last_activity timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS admin_session_last_activity_idx
   ON admin_session (last_activity);
+CREATE INDEX IF NOT EXISTS admin_session_admin_idx
+  ON admin_session (admin_id, last_activity DESC);
 
 CREATE TABLE IF NOT EXISTS admin_login_limit (
   ip_hash text PRIMARY KEY CHECK (ip_hash ~ '^[a-f0-9]{64}$'),
