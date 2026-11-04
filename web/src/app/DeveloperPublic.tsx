@@ -14,7 +14,15 @@ async function post(path: string, body: unknown): Promise<void> {
 }
 
 export function DeveloperPublicHeader() {
-  return <header className="developer-public-header"><Link className="developer-public-brand" to="/"><img src="/assets/moondrop.ico" alt="MOONDROP" /><span><strong>MOONDROP</strong><small>开放平台</small></span></Link><nav><a href="/developer/docs">接入文档</a><Link to="/developer/login">登录</Link><Link className="button primary" to="/developer/register">注册开发者</Link></nav></header>;
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => {
+    let active = true;
+    apiGet<{ account: { id: string } | null }>('/api/v1/developer-auth/session')
+      .then((session) => { if (active) setSignedIn(Boolean(session.account)); })
+      .catch(() => { if (active) setSignedIn(false); });
+    return () => { active = false; };
+  }, []);
+  return <header className="developer-public-header"><Link className="developer-public-brand" to="/"><img src="/assets/moondrop.ico" alt="MOONDROP" /><span><strong>MOONDROP</strong><small>开放平台</small></span></Link><nav><a href="/developer/docs">接入文档</a>{signedIn ? <Link className="button primary" to="/developer/console/overview">进入控制台</Link> : <><Link to="/developer/login">登录</Link><Link className="button primary" to="/developer/register">注册开发者</Link></>}</nav></header>;
 }
 
 export function DeveloperLanding() {

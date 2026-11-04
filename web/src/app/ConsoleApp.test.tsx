@@ -13,7 +13,7 @@ test('removed account routes return to the developer portal', () => {
 
   expect(screen.getByRole('heading', { name: '连接用户与应用，从一个可信身份开始' })).toBeInTheDocument();
   expect(window.location.pathname).toBe('/');
-  expect(fetch).not.toHaveBeenCalled();
+  expect(fetch).toHaveBeenCalledWith('/api/v1/developer-auth/session', expect.anything());
 });
 
 test('shows live developer overview data for the signed-in account', async () => {

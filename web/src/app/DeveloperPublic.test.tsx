@@ -46,14 +46,14 @@ test('developer registration uses email code and password without a phone field'
   expect(screen.queryByLabelText('手机号')).not.toBeInTheDocument();
 });
 
-test('developer documentation is public and does not load a private session', () => {
+test('developer documentation remains public while checking header session state', () => {
   window.history.replaceState({}, '', '/developer/docs');
   const fetch = vi.fn();
   vi.stubGlobal('fetch', fetch);
   render(<ConsoleApp />);
 
   expect(screen.getByText('QUICK START')).toBeInTheDocument();
-  expect(fetch).not.toHaveBeenCalled();
+  expect(fetch).toHaveBeenCalledWith('/api/v1/developer-auth/session', expect.anything());
 });
 
 test('MOONDROP first login offers create or verified existing-account binding', async () => {
