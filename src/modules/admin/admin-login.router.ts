@@ -5,7 +5,9 @@ import type { Pool } from 'pg';
 
 import type { ServiceConfig } from '../../infrastructure/config/config.schema.js';
 import { readCookie } from '../../common/security/http-security.js';
-import { constantTimeEqual, escapeHtml, randomToken, verifyScryptPassword } from '../../common/security/security.js';
+import { constantTimeEqual, escapeHtml, randomToken } from '../../common/security/security.js';
+import type { AdminAuthenticationService } from './application/admin-authentication.service.js';
+import type { PostgresAdminRepository } from './infrastructure/admin.repository.js';
 
 function scalar(value: unknown): string | null { return typeof value === 'string' ? value : null; }
 function body(request: Request): Record<string, unknown> { return typeof request.body === 'object' && request.body !== null && !Array.isArray(request.body) ? request.body as Record<string, unknown> : {}; }
@@ -38,7 +40,12 @@ function requestOriginAllowed(request: Request, issuer: string): boolean {
   return request.header('sec-fetch-site') === 'same-origin';
 }
 
-export function createAdminLoginRouter(pool: Pool, config: ServiceConfig): Router {
+export function createAdminLoginRouter(
+  pool: Pool,
+  config: ServiceConfig,
+  authentication: Pick<AdminAuthenticationService, 'login'>,
+  administrators: Pick<PostgresAdminRepository, 'createSession'>,
+): Router {
   const router = Router();
   router.use(express.urlencoded({ extended: false, limit: '16kb', parameterLimit: 20 }));
   router.use(express.json({ limit: '16kb' }));
@@ -77,15 +84,14 @@ export function createAdminLoginRouter(pool: Pool, config: ServiceConfig): Route
     try {
       const limit = await pool.query<{ blocked: boolean }>('SELECT coalesce(bool_or(blocked_until > now()), false) AS blocked FROM admin_login_limit WHERE ip_hash = $1', [key]);
       if (limit.rows[0]?.blocked) return sendError(response, 429, '登录尝试过多，请稍后再试。');
-      const passwordValid = typeof password === 'string' && password.length > 0 && password.length <= 1024 ? verifyScryptPassword(password, config.admin.passwordHash) : false;
-      const usernameValid = typeof username === 'string' && constantTimeEqual(username, config.admin.username);
-      if (!passwordValid || !usernameValid) {
+      const principal = await authentication.login(username, password);
+      if (!principal) {
         await pool.query("INSERT INTO admin_login_limit (ip_hash, window_started_at, failed_attempts, blocked_until) VALUES ($1, now(), 1, NULL) ON CONFLICT (ip_hash) DO UPDATE SET window_started_at = CASE WHEN admin_login_limit.window_started_at < now() - interval '15 minutes' THEN now() ELSE admin_login_limit.window_started_at END, failed_attempts = CASE WHEN admin_login_limit.window_started_at < now() - interval '15 minutes' THEN 1 ELSE admin_login_limit.failed_attempts + 1 END, blocked_until = CASE WHEN admin_login_limit.window_started_at < now() - interval '15 minutes' THEN NULL WHEN admin_login_limit.failed_attempts + 1 >= 5 THEN now() + interval '15 minutes' ELSE admin_login_limit.blocked_until END", [key]);
         return sendError(response, 401, '管理员账号或密码不正确。');
       }
       await pool.query('DELETE FROM admin_login_limit WHERE ip_hash = $1', [key]);
       const token = randomToken(32);
-      await pool.query('INSERT INTO admin_session (session_hash) VALUES ($1)', [hashToken(token)]);
+      await administrators.createSession(principal.id, hashToken(token));
       response.cookie(cookieName, token, { httpOnly: true, sameSite: 'strict', secure, path: '/', maxAge: 8 * 60 * 60 * 1000 });
       response.clearCookie(csrfCookieName, { path: '/', secure, sameSite: 'strict' });
       response.redirect(303, '/admin/applications');

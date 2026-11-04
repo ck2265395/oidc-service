@@ -21,10 +21,10 @@ export class SessionController {
       const identity = await this.accounts.identity(await this.sessions.accountId(request, response), 'console-bootstrap');
       if (identity) account = this.accounts.accountSummary(identity);
     } catch { account = null; }
-    const authenticated = await this.adminAuth.authenticated(request).catch(() => false);
+    const administrator = await this.adminAuth.authenticated(request).catch(() => null);
     const secure = this.accounts.settings.issuer.startsWith('https:');
     response.json({ code: 0, desc: 'ok', data: {
-      account, admin: authenticated ? { authenticated: true, username: this.accounts.settings.admin.username } : { authenticated: false },
+      account, admin: administrator ? { authenticated: true, username: administrator.username, mustChangePassword: administrator.mustChangePassword } : { authenticated: false },
       csrfToken: setConsoleCsrf(response, secure),
     } });
   }

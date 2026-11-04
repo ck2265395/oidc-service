@@ -63,8 +63,8 @@ test('Nest account API exposes administrator bootstrap without session identifie
   const response = await fetch(target.base + '/api/v1/session');
   assert.equal(response.status, 200);
   const body = await response.json() as { data: { admin: unknown } };
-  assert.deepEqual(body.data.admin, { authenticated: true, username: 'ops' });
-  assert.deepEqual(Object.keys(body.data.admin as object).sort(), ['authenticated', 'username']);
+  assert.deepEqual(body.data.admin, { authenticated: true, username: 'ops', mustChangePassword: false });
+  assert.deepEqual(Object.keys(body.data.admin as object).sort(), ['authenticated', 'mustChangePassword', 'username']);
 });
 
 test('Nest account API enforces authorization ownership and CSRF before revocation', async (context) => {

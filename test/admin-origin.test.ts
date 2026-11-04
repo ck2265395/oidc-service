@@ -7,7 +7,7 @@ import type { Pool } from 'pg';
 
 import { createAdminLoginRouter } from '../src/modules/admin/admin-login.router.js';
 import type { ServiceConfig } from '../src/infrastructure/config/config.schema.js';
-import { hashScryptPassword } from '../src/common/security/security.js';
+import { AdminAuthenticationService, hashAdminPassword } from '../src/modules/admin/application/admin-authentication.service.js';
 
 test('accepts an opaque Origin only for a browser-declared same-origin form', async (context) => {
   const pool = {
@@ -20,7 +20,7 @@ test('accepts an opaque Origin only for a browser-declared same-origin form', as
     issuer: 'http://127.0.0.1:3000',
     port: 3000,
     secrets: { legacyHmacKey: 'legacy-key&&', cookie: 'c'.repeat(43), fingerprint: 'f'.repeat(43), subject: 's'.repeat(43), encryption: 'e'.repeat(43) },
-    admin: { username: 'admin', passwordHash: hashScryptPassword('correct-password') },
+    admin: { username: 'legacy-config-user', passwordHash: hashAdminPassword('legacy-password') },
     databases: { oidc: '', accounts: '' },
     redisUrl: 'redis://127.0.0.1:6379/0',
     redisUsername: null,
@@ -31,8 +31,12 @@ test('accepts an opaque Origin only for a browser-declared same-origin form', as
     accountPortal: null,
     profilePictureBaseUrl: null,
   } satisfies ServiceConfig;
+  const passwordHash = hashAdminPassword('correct-password');
+  const authentication = new AdminAuthenticationService({ async findCredential(username) { return username === 'admin' ? { principal: { id: 'admin-id', username: 'admin', mustChangePassword: false }, passwordHash, status: 'active' } : null; } });
+  const sessions: Array<[string, string]> = [];
+  const repository = { async createSession(adminId: string, sessionHash: string) { sessions.push([adminId, sessionHash]); } };
   const app = express();
-  app.use('/admin', createAdminLoginRouter(pool, config));
+  app.use('/admin', createAdminLoginRouter(pool, config, authentication, repository));
   const server = createServer(app);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   context.after(() => new Promise<void>((resolve, reject) => {
@@ -78,4 +82,5 @@ test('accepts an opaque Origin only for a browser-declared same-origin form', as
   assert.match(sessionCookie, /HttpOnly/i);
   assert.match(sessionCookie, /SameSite=Strict/i);
   assert.match(sessionCookie, /Path=\//i);
+  assert.equal(sessions[0]?.[0], 'admin-id');
 });
