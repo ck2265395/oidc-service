@@ -7,10 +7,11 @@ import { DeveloperBinding, DeveloperLanding, DeveloperLogin, DeveloperRegister }
 
 type ConsoleKind = 'account' | 'developer' | 'admin';
 type ApplicationStatus = 'draft' | 'pending' | 'rejected' | 'approved' | 'disabled';
+type AdminRole = 'super_admin' | 'operator' | 'auditor';
 
 interface SessionData {
   account: { uuid: string; nickname: string; email: string | null; picture: string | null } | null;
-  admin: { authenticated: boolean; username?: string };
+  admin: { authenticated: boolean; username?: string; role?: AdminRole; mustChangePassword?: boolean };
   csrfToken: string;
   developerStatus?: 'unsubmitted' | 'pending' | 'approved' | 'rejected' | 'disabled';
   developerReview?: { reason: string | null; reviewedAt: string } | null;
@@ -28,14 +29,15 @@ interface AdminApplication extends ApplicationRecord { ownerUuid: string; approv
 interface AdminDeveloper { id: string; status: NonNullable<SessionData['developerStatus']>; revision: number; displayName: string; contactEmail: string; identityTypes: string[]; reviewCount: number }
 interface AuditRecord { created_at: string; actor_type: string; actor_id: string | null; action: string; application_id: string | null; outcome: string; details: unknown }
 interface StatisticRecord { action: string; outcome: string; request_count: number; average_ms: number | null; p95_ms: number | null }
+interface AdministratorRecord { id: string; username: string; role: AdminRole; status: 'active' | 'disabled'; mustChangePassword: boolean; createdAt?: string }
 
 const consoleCopy: Record<ConsoleKind, { label: string; title: string; items: Array<[string, string]> }> = {
   account: { label: '账号中心', title: '个人账号', items: [['/account/profile', '个人资料'], ['/account/authorizations', '应用授权']] },
   developer: { label: '开发者控制台', title: '开发者空间', items: [['/developer/console/overview', '概览'], ['/developer/console/profile', '个人资料'], ['/developer/console/review', '开发者审核'], ['/developer/console/applications', '我的应用'], ['/developer/console/groups', '应用组'], ['/developer/console/security', '安全设置'], ['/developer/docs', '接入文档']] },
-  admin: { label: '运营管理后台', title: '平台管理', items: [['/admin/overview', '概览'], ['/admin/developers', '开发者审核'], ['/admin/applications', '应用审核'], ['/admin/groups', '应用组审核'], ['/admin/audit', '操作审计'], ['/admin/statistics', '统计分析']] },
+  admin: { label: '运营管理后台', title: '平台管理', items: [['/admin/overview', '概览'], ['/admin/developers', '开发者审核'], ['/admin/applications', '应用审核'], ['/admin/groups', '应用组审核'], ['/admin/audit', '操作审计'], ['/admin/statistics', '统计分析'], ['/admin/administrators', '管理员管理']] },
 };
 
-const statusText: Record<string, string> = { draft: '草稿', pending: '待审核', rejected: '已驳回', approved: '已通过', disabled: '已停用' };
+const statusText: Record<string, string> = { draft: '草稿', pending: '待审核', rejected: '已驳回', approved: '已通过', active: '已启用', disabled: '已停用' };
 
 function Brand({ compact = false }: { compact?: boolean }) {
   return <Link className="brand" to="/" aria-label="MOONDROP 首页"><img className="brand-mark" src="/assets/moondrop.ico" alt="MOONDROP" />{!compact && <span><strong>MOONDROP</strong><small>统一身份平台</small></span>}</Link>;
@@ -329,9 +331,51 @@ function AdminStatistics() {
   return <section className="panel"><div className="panel-heading"><div><span>PROTOCOL METRICS</span><h2>协议请求统计</h2><p>按 OIDC 端点与结果汇总请求量、平均延迟和 P95 延迟。</p></div><label className="filter-select"><span>统计周期</span><select value={days} onChange={(event) => setDays(event.target.value)}><option value="1">1 天</option><option value="7">7 天</option><option value="30">30 天</option><option value="90">90 天</option></select></label></div><DataTable headers={['端点', '结果', '请求数', '平均延迟', 'P95 延迟']} empty="周期内暂无协议请求">{resource.data.list.map((item) => <tr key={`${item.action}-${item.outcome}`}><td><code>{item.action.replace('protocol.', '')}</code></td><td><Status value={item.outcome} /></td><td>{item.request_count}</td><td>{item.average_ms ?? '—'} ms</td><td>{item.p95_ms ?? '—'} ms</td></tr>)}</DataTable></section>;
 }
 
+function AdminPasswordChange({ csrfToken }: { csrfToken: string }) {
+  const [message, setMessage] = useState('');
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const currentPassword = String(form.get('currentPassword') || '');
+    const nextPassword = String(form.get('nextPassword') || '');
+    if (nextPassword !== String(form.get('confirmation') || '')) { setMessage('两次输入的新密码不一致'); return; }
+    try {
+      await consoleMutation('/api/v1/admin/password', 'POST', csrfToken, { currentPassword, nextPassword });
+      setMessage('密码已修改，请重新登录');
+      window.location.assign('/admin/login');
+    } catch (reason) { setMessage(reason instanceof Error ? reason.message : '密码修改失败'); }
+  };
+  return <section className="panel form-panel password-change-panel"><div className="panel-heading"><div><span>SECURITY REQUIRED</span><h2>修改管理员密码</h2><p>当前使用的是临时密码，修改后才能继续使用运营管理后台。</p></div></div><form className="form-grid" onSubmit={submit}><label><span>当前密码</span><input name="currentPassword" type="password" autoComplete="current-password" required /></label><label><span>新密码</span><input name="nextPassword" type="password" autoComplete="new-password" minLength={12} required /></label><label><span>确认新密码</span><input name="confirmation" type="password" autoComplete="new-password" minLength={12} required /></label><div className="form-actions full-field"><button className="button primary" type="submit">保存新密码</button><span role="status">{message}</span></div></form></section>;
+}
+
+function AdminAdministrators({ csrfToken, currentUsername }: { csrfToken: string; currentUsername?: string }) {
+  const resource = useResource(() => apiGet<PageResult<AdministratorRecord>>('/api/v1/admin/administrators?page=1&pageSize=100'));
+  const [creating, setCreating] = useState(false);
+  const [message, setMessage] = useState('');
+  const [temporaryPassword, setTemporaryPassword] = useState('');
+  if (!resource.data) return <Feedback loading={resource.loading} error={resource.error} />;
+  const mutate = async (path: string, body?: unknown) => {
+    try { await consoleMutation(path, 'POST', csrfToken, body); setMessage('管理员信息已更新'); resource.reload(); }
+    catch (reason) { setMessage(reason instanceof Error ? reason.message : '操作失败'); }
+  };
+  const create = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); const form = new FormData(event.currentTarget);
+    try {
+      const result = await consoleMutation<{ administrator: AdministratorRecord; temporaryPassword: string }>('/api/v1/admin/administrators', 'POST', csrfToken, { username: form.get('username'), role: form.get('role') });
+      setTemporaryPassword(result.temporaryPassword); setCreating(false); setMessage('管理员已创建'); resource.reload();
+    } catch (reason) { setMessage(reason instanceof Error ? reason.message : '创建失败'); }
+  };
+  const reset = async (item: AdministratorRecord) => {
+    if (!window.confirm(`确定重置管理员 ${item.username} 的密码吗？`)) return;
+    try { const result = await consoleMutation<{ temporaryPassword: string }>(`/api/v1/admin/administrators/${item.id}/reset-password`, 'POST', csrfToken); setTemporaryPassword(result.temporaryPassword); setMessage('密码已重置'); resource.reload(); }
+    catch (reason) { setMessage(reason instanceof Error ? reason.message : '密码重置失败'); }
+  };
+  return <>{temporaryPassword && <section className="secret-notice"><strong>请立即保存临时密码</strong><p>该密码只展示一次，管理员首次登录后必须修改。</p><code>{temporaryPassword}</code><button type="button" onClick={() => setTemporaryPassword('')}>我已保存</button></section>}{creating && <section className="panel compact-form"><form onSubmit={create}><label><span>管理员账号</span><input name="username" required maxLength={128} autoComplete="off" /></label><label><span>角色</span><select name="role" defaultValue="operator"><option value="super_admin">超级管理员</option><option value="operator">运营人员</option><option value="auditor">审计人员</option></select></label><button className="button primary" type="submit">创建</button><button className="button secondary" type="button" onClick={() => setCreating(false)}>取消</button></form></section>}<section className="panel"><div className="panel-heading"><div><span>ADMINISTRATORS</span><h2>管理员管理</h2><p>管理后台账号、固定角色、启用状态与临时密码。</p></div><button className="button primary" type="button" onClick={() => setCreating(true)}>新增管理员</button></div><span className="operation-message" role="status">{message}</span><DataTable headers={['账号', '角色', '状态', '首次改密', '创建时间', '操作']} empty="暂无管理员">{resource.data.list.map((item) => { const self = item.username === currentUsername; return <tr key={item.id}><td><strong>{item.username}</strong>{self && <small className="cell-note">当前账号</small>}</td><td><select aria-label={`${item.username} 角色`} value={item.role} disabled={self} onChange={(event) => void mutate(`/api/v1/admin/administrators/${item.id}/role`, { role: event.target.value })}><option value="super_admin">超级管理员</option><option value="operator">运营人员</option><option value="auditor">审计人员</option></select></td><td><Status value={item.status} /></td><td>{item.mustChangePassword ? '需要' : '已完成'}</td><td>{item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN') : '—'}</td><td><div className="row-actions"><button type="button" disabled={self} onClick={() => void mutate(`/api/v1/admin/administrators/${item.id}/status`, { status: item.status === 'active' ? 'disabled' : 'active' })}>{item.status === 'active' ? '停用' : '启用'}</button><button type="button" onClick={() => void reset(item)}>重置密码</button></div></td></tr>; })}</DataTable></section></>;
+}
+
 function Placeholder({ title }: { title: string }) { return <section className="placeholder-panel"><div className="placeholder-icon">◆</div><h2>{title}</h2><p>该模块正在接入统一控制台数据与操作流程。</p></section>; }
 
-function ConsoleContent({ kind, active, csrfToken, developerStatus, developerRevision, authenticationMethods = [] }: { kind: ConsoleKind; active: string; csrfToken: string; developerStatus?: SessionData['developerStatus']; developerRevision?: number; authenticationMethods?: Array<'email' | 'moondrop'> }) {
+function ConsoleContent({ kind, active, csrfToken, developerStatus, developerRevision, authenticationMethods = [], adminUsername }: { kind: ConsoleKind; active: string; csrfToken: string; developerStatus?: SessionData['developerStatus']; developerRevision?: number; authenticationMethods?: Array<'email' | 'moondrop'>; adminUsername?: string }) {
   const location = useLocation();
   const pathname = location.pathname.replace(/^\/developer\/console/, '/developer');
   if (pathname === '/account/profile') return <AccountProfilePage />;
@@ -352,6 +396,7 @@ function ConsoleContent({ kind, active, csrfToken, developerStatus, developerRev
   if (location.pathname.startsWith('/admin/groups/')) return <AdminGroupDetail id={location.pathname.slice('/admin/groups/'.length)} csrfToken={csrfToken} />;
   if (location.pathname === '/admin/audit') return <AdminAudit />;
   if (location.pathname === '/admin/statistics') return <AdminStatistics />;
+  if (location.pathname === '/admin/administrators') return <AdminAdministrators csrfToken={csrfToken} currentUsername={adminUsername} />;
   return <Placeholder title={active || consoleCopy[kind].label} />;
 }
 
@@ -377,6 +422,7 @@ function ConsoleShell({ kind }: { kind: ConsoleKind }) {
     return () => window.removeEventListener('developer-session-changed', refresh);
   }, [session.reload]);
   const signedIn = kind === 'admin' ? session.data?.admin.authenticated : Boolean(session.data?.account);
+  const items = kind === 'admin' && session.data?.admin.role !== 'super_admin' ? copy.items.filter(([path]) => path !== '/admin/administrators') : copy.items;
   const loginHref = kind === 'admin' ? '/admin/login' : `/developer/login?returnTo=${encodeURIComponent(location.pathname)}`;
   const logoutAdmin = async () => {
     if (!session.data?.csrfToken) return;
@@ -392,7 +438,7 @@ function ConsoleShell({ kind }: { kind: ConsoleKind }) {
   };
   const developerStatus = session.data?.developerStatus;
   const statusCopy = developerStatus ? ({ unsubmitted: ['未提交审核', '完善开发者资料后手动提交审核'], pending: ['审核中', '平台管理员正在审核开发者资质'], approved: ['审核通过', '可以创建应用和应用组'], rejected: ['审核已驳回', '请根据审核意见修改资料后重新提交'], disabled: ['账号已禁用', '请联系平台管理员处理'] } as const)[developerStatus] : null;
-  return <div className="console-layout"><aside className="sidebar"><div className="sidebar-brand"><Brand /></div><div className="workspace-label"><span>当前工作区</span><strong>{copy.title}</strong></div><nav className="side-nav" aria-label={copy.label}>{copy.items.map(([path, label], index) => <Link className={location.pathname === path ? 'active' : ''} to={path} key={path}><span>{String(index + 1).padStart(2, '0')}</span>{label}</Link>)}</nav><Link className="sidebar-help" to="/developer/docs">帮助与文档<span>→</span></Link></aside><div className="console-main"><header className="console-header"><div className="breadcrumb">MOONDROP <span>/</span> {copy.label} <span>/</span> <strong>{active}</strong></div><div className="header-actions"><span className="header-user">{session.data?.account?.nickname || session.data?.admin.username || '访客'}</span>{kind === 'admin' && signedIn && <button className="header-logout" type="button" onClick={() => void logoutAdmin()}>退出</button>}{kind === 'developer' && signedIn && <button className="header-logout" type="button" onClick={() => void logoutDeveloper()}>退出登录</button>}<span className="avatar">{(session.data?.account?.nickname || session.data?.admin.username || 'MD').slice(0, 2).toUpperCase()}</span></div></header><main className="workspace"><div className="page-title"><div><span>{copy.label}</span><h1>{active}</h1><p>统一身份平台工作区，所有关键操作均可追踪与审计。</p></div></div>{session.loading ? <Feedback loading error="" /> : !signedIn ? <section className="panel auth-required"><span className="placeholder-icon">↗</span><h2>需要登录后继续</h2><p>{kind === 'admin' ? '请使用平台管理员凭据登录。' : '使用开发者邮箱或水月雨账号登录后继续。'}</p><a className="button primary" href={loginHref}>前往登录</a></section> : <>{kind === 'developer' && statusCopy && <section className={`developer-status-card status-${developerStatus}`}><div><span>开发者状态</span><strong>{statusCopy[0]}</strong><small>{session.data?.developerReview?.reason || statusCopy[1]}</small></div>{developerStatus === 'unsubmitted' && <Link className="button primary" to="/developer/console/profile">完善资料</Link>}</section>}<ConsoleContent kind={kind} active={active} csrfToken={session.data?.csrfToken || ''} developerStatus={developerStatus} /></>}</main></div></div>;
+  return <div className="console-layout"><aside className="sidebar"><div className="sidebar-brand"><Brand /></div><div className="workspace-label"><span>当前工作区</span><strong>{copy.title}</strong></div><nav className="side-nav" aria-label={copy.label}>{items.map(([path, label], index) => <Link className={location.pathname === path ? 'active' : ''} to={path} key={path}><span>{String(index + 1).padStart(2, '0')}</span>{label}</Link>)}</nav><Link className="sidebar-help" to="/developer/docs">帮助与文档<span>→</span></Link></aside><div className="console-main"><header className="console-header"><div className="breadcrumb">MOONDROP <span>/</span> {copy.label} <span>/</span> <strong>{active}</strong></div><div className="header-actions"><span className="header-user">{session.data?.account?.nickname || session.data?.admin.username || '访客'}</span>{kind === 'admin' && signedIn && <button className="header-logout" type="button" onClick={() => void logoutAdmin()}>退出</button>}{kind === 'developer' && signedIn && <button className="header-logout" type="button" onClick={() => void logoutDeveloper()}>退出登录</button>}<span className="avatar">{(session.data?.account?.nickname || session.data?.admin.username || 'MD').slice(0, 2).toUpperCase()}</span></div></header><main className="workspace"><div className="page-title"><div><span>{copy.label}</span><h1>{active}</h1><p>统一身份平台工作区，所有关键操作均可追踪与审计。</p></div></div>{session.loading ? <Feedback loading error="" /> : !signedIn ? <section className="panel auth-required"><span className="placeholder-icon">↗</span><h2>需要登录后继续</h2><p>{kind === 'admin' ? '请使用平台管理员凭据登录。' : '使用开发者邮箱或水月雨账号登录后继续。'}</p><a className="button primary" href={loginHref}>前往登录</a></section> : kind === 'admin' && session.data?.admin.mustChangePassword ? <AdminPasswordChange csrfToken={session.data.csrfToken} /> : <>{kind === 'developer' && statusCopy && <section className={`developer-status-card status-${developerStatus}`}><div><span>开发者状态</span><strong>{statusCopy[0]}</strong><small>{session.data?.developerReview?.reason || statusCopy[1]}</small></div>{developerStatus === 'unsubmitted' && <Link className="button primary" to="/developer/console/profile">完善资料</Link>}</section>}<ConsoleContent kind={kind} active={active} csrfToken={session.data?.csrfToken || ''} developerStatus={developerStatus} adminUsername={session.data?.admin.username} /></>}</main></div></div>;
 }
 
 export function ConsoleApp() {

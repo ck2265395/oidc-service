@@ -62,3 +62,43 @@ test('shows live developer overview data for the signed-in account', async () =>
     headers: expect.objectContaining({ 'x-csrf-token': 'console-token' }),
   }));
 });
+
+function adminFetch(session: Record<string, unknown>, administrators: unknown = { total: 0, list: [] }) {
+  return vi.fn(async (input: RequestInfo | URL) => {
+    const raw = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const parsed = new URL(raw, 'http://localhost');
+    const data = parsed.pathname === '/api/v1/session' ? { account: null, admin: session, csrfToken: 'admin-csrf' }
+      : parsed.pathname === '/api/v1/admin/administrators' ? administrators : null;
+    return new Response(JSON.stringify({ code: 0, desc: 'ok', data }), { status: data ? 200 : 404, headers: { 'content-type': 'application/json' } });
+  });
+}
+
+test('super administrator sees the administrator management page', async () => {
+  window.history.replaceState({}, '', '/admin/administrators');
+  vi.stubGlobal('fetch', adminFetch(
+    { authenticated: true, username: 'root', role: 'super_admin', mustChangePassword: false },
+    { total: 1, list: [{ id: 'admin-1', username: 'root', role: 'super_admin', status: 'active', mustChangePassword: false }] },
+  ));
+  render(<ConsoleApp />);
+  await waitFor(() => expect(screen.getByRole('button', { name: '新增管理员' })).toBeInTheDocument());
+  expect(screen.getByRole('link', { name: /管理员管理/ })).toBeInTheDocument();
+  expect(screen.getAllByText('root')).toHaveLength(2);
+});
+
+test('operator does not see administrator management navigation', async () => {
+  window.history.replaceState({}, '', '/admin/overview');
+  vi.stubGlobal('fetch', adminFetch({ authenticated: true, username: 'operator', role: 'operator', mustChangePassword: false }));
+  render(<ConsoleApp />);
+  await waitFor(() => expect(screen.getByText('operator')).toBeInTheDocument());
+  expect(screen.queryByRole('link', { name: /管理员管理/ })).not.toBeInTheDocument();
+});
+
+test('administrator with a temporary password must replace it before using the console', async () => {
+  window.history.replaceState({}, '', '/admin/overview');
+  vi.stubGlobal('fetch', adminFetch({ authenticated: true, username: 'root', role: 'super_admin', mustChangePassword: true }));
+  render(<ConsoleApp />);
+  await waitFor(() => expect(screen.getByRole('heading', { name: '修改管理员密码' })).toBeInTheDocument());
+  expect(screen.getByLabelText('当前密码')).toBeInTheDocument();
+  expect(screen.getByLabelText('新密码')).toBeInTheDocument();
+  expect(screen.queryByText('协议请求统计')).not.toBeInTheDocument();
+});
