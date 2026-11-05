@@ -1,0 +1,146 @@
+import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+import test from 'node:test';
+
+import { ConfigError, loadConfig } from '../src/infrastructure/config/config.schema.js';
+
+const testSecret = () => randomBytes(32).toString('base64url');
+
+const validConfig = () => ({
+  mode: 'test',
+  issuer: 'https://identity.example.test',
+  port: 3000,
+  secrets: {
+    legacyHmacKey: testSecret(),
+    cookie: testSecret(),
+    fingerprint: testSecret(),
+    subject: testSecret(),
+    encryption: testSecret(),
+  },
+  databases: {
+    oidc: 'postgres://oidc:secret@localhost:5432/oidc_test',
+    accounts: 'postgres://reader:secret@localhost:5432/accounts_test',
+  },
+  redisUrl: 'redis://localhost:6379/0',
+  trustedProxyCidrs: [] as string[],
+});
+
+test('accepts a complete test configuration', () => {
+  const config = loadConfig(validConfig());
+
+  assert.equal(config.mode, 'test');
+  assert.equal(config.port, 3000);
+  assert.equal(config.issuer, 'https://identity.example.test');
+  assert.deepEqual(config.loginRateLimit, { windowSeconds: 900, accountAttempts: 10, ipAttempts: 100 });
+});
+
+test('rejects non-object and array configuration values', () => {
+  assert.throws(() => loadConfig(null), ConfigError);
+  assert.throws(() => loadConfig([]), ConfigError);
+  assert.throws(() => loadConfig('config'), ConfigError);
+});
+
+test('rejects weak or placeholder secrets', () => {
+  const input = validConfig();
+  input.secrets.cookie = 'replace-me';
+
+  assert.throws(() => loadConfig(input), /secrets\.cookie/);
+});
+
+test('rejects long but low-diversity secrets', () => {
+  const input = validConfig();
+  input.secrets.cookie = 'A'.repeat(48);
+
+  assert.throws(() => loadConfig(input), /secrets\.cookie/);
+});
+
+test('requires independent cryptographic keys', () => {
+  const input = validConfig();
+  input.secrets.fingerprint = input.secrets.cookie;
+
+  assert.throws(() => loadConfig(input), /independent/);
+});
+
+
+test('requires an independently supplied legacy account key', () => {
+  const input = validConfig();
+  input.secrets.legacyHmacKey = 'CHANGE_ME_USE_THE_EXISTING_ACCOUNT_KEY';
+
+  assert.throws(() => loadConfig(input), /secrets\.legacyHmacKey/);
+});
+
+test('accepts Redis credentials separately from the URL', () => {
+  const input = { ...validConfig(), redisUsername: 'default', redisPassword: 'redis-secret' };
+  const config = loadConfig(input);
+
+  assert.equal(config.redisUsername, 'default');
+  assert.equal(config.redisPassword, 'redis-secret');
+});
+
+test('rejects Redis credentials embedded in the URL', () => {
+  const input = { ...validConfig(), redisUrl: 'redis://default:redis-secret@localhost:6379/0' };
+
+  assert.throws(() => loadConfig(input), /without embedded credentials/);
+});
+
+test('accepts the existing account system legacy key length', () => {
+  const input = validConfig();
+  input.secrets.legacyHmacKey = 'legacy-key&&';
+
+  assert.equal(loadConfig(input).secrets.legacyHmacKey, 'legacy-key&&');
+});
+
+test('requires HTTPS issuer in production', () => {
+  const input = validConfig();
+  input.mode = 'production';
+  input.issuer = 'http://identity.example.test';
+
+  assert.throws(() => loadConfig(input), /https/i);
+});
+
+test('rejects public or malformed database URLs', () => {
+  const input = validConfig();
+  input.databases.accounts = 'https://example.test/accounts';
+
+  assert.throws(() => loadConfig(input), /databases\.accounts/);
+});
+
+test('rejects obsolete configured administrator credentials', () => {
+  const input = { ...validConfig(), admin: { username: 'admin', passwordHash: 'obsolete' } };
+  assert.throws(() => loadConfig(input), /admin.*database/i);
+});
+
+test('rejects a non-integer port outside the TCP range', () => {
+  const input = validConfig();
+  input.port = 65536;
+
+  assert.throws(() => loadConfig(input), /port/);
+});
+test('validates explicitly trusted proxy CIDRs', () => {
+  const input = validConfig();
+  input.trustedProxyCidrs = ['127.0.0.1', '10.20.0.0/16', '2001:db8::/32'];
+  assert.deepEqual(loadConfig(input).trustedProxyCidrs, input.trustedProxyCidrs);
+});
+
+test('rejects malformed or overly broad proxy configuration entries', () => {
+  for (const entry of ['proxy.local', '10.0.0.0/33', '127.0.0.1\t']) {
+    const input = validConfig();
+    input.trustedProxyCidrs = [entry];
+    assert.throws(() => loadConfig(input), /trustedProxyCidrs/);
+  }
+});
+
+test('accepts bounded configurable login rate limits', () => {
+  const input = { ...validConfig(), loginRateLimit: { windowSeconds: 600, accountAttempts: 8, ipAttempts: 80 } };
+  assert.deepEqual(loadConfig(input).loginRateLimit, input.loginRateLimit);
+});
+
+test('rejects invalid login rate limit values', () => {
+  for (const loginRateLimit of [
+    { windowSeconds: 10, accountAttempts: 10, ipAttempts: 100 },
+    { windowSeconds: 900, accountAttempts: 0, ipAttempts: 100 },
+    { windowSeconds: 900, accountAttempts: 10, ipAttempts: 10001 },
+  ]) {
+    assert.throws(() => loadConfig({ ...validConfig(), loginRateLimit }), /loginRateLimit/);
+  }
+});

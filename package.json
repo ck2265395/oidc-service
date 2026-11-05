@@ -1,0 +1,57 @@
+{
+  "name": "oidc-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "web"
+  ],
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11"
+  },
+  "scripts": {
+    "dev": "node --env-file=.env.local node_modules/tsx/dist/cli.mjs watch src/main.ts",
+    "dev:once": "node --env-file=.env.local node_modules/tsx/dist/cli.mjs src/main.ts",
+    "start": "node dist/src/main.js",
+    "build": "npm run build:server && npm run build:web",
+    "build:server": "tsc -p tsconfig.json",
+    "build:web": "npm run build --workspace web",
+    "check": "tsc --noEmit -p tsconfig.json && npm run check --workspace web",
+    "lint": "eslint src test scripts eslint.config.js",
+    "keys": "tsx scripts/keys.ts",
+    "admin:create": "node dist/scripts/admin-create.js",
+    "admin:create:local": "node --env-file=.env.local dist/scripts/admin-create.js",
+    "test": "tsx --test test/*.test.ts",
+    "test:web": "npm run test --workspace web",
+    "dev:web": "npm run dev --workspace web",
+    "test:storage": "tsx --test test/storage/*.test.ts",
+    "migrate": "node dist/scripts/migrate.js",
+    "migrate:local": "node --env-file=.env.local dist/scripts/migrate.js",
+    "clean:expired": "node dist/scripts/clean-expired.js",
+    "sbom": "npm sbom --sbom-format=cyclonedx --sbom-type=application --omit=dev > sbom.cdx.json"
+  },
+  "dependencies": {
+    "@nestjs/common": "12.3.0",
+    "@nestjs/core": "12.3.0",
+    "@nestjs/platform-express": "12.3.0",
+    "express": "5.3.0",
+    "jose": "6.2.13",
+    "nodemailer": "10.2.1",
+    "oidc-provider": "9.13.3",
+    "pg": "8.23.1",
+    "redis": "6.3.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/node": "24.19.2",
+    "@types/oidc-provider": "9.13.0",
+    "@types/pg": "8.23.1",
+    "eslint": "10.13.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1"
+  }
+}

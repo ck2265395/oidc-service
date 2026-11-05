@@ -1,0 +1,253 @@
+import { isIP } from 'node:net';
+
+export type RuntimeMode = 'development' | 'test' | 'production';
+
+export interface ServiceConfig {
+  mode: RuntimeMode;
+  issuer: string;
+  port: number;
+  secrets: {
+    legacyHmacKey: string;
+    cookie: string;
+    fingerprint: string;
+    subject: string;
+    encryption: string;
+  };
+  databases: {
+    oidc: string;
+    accounts: string;
+  };
+  redisUrl: string;
+  redisUsername: string | null;
+  redisPassword: string | null;
+  trustedProxyCidrs: string[];
+  loginRateLimit: { windowSeconds: number; accountAttempts: number; ipAttempts: number };
+  smtp: { host: string; port: number; secure: boolean; user: string | null; password: string | null; from: string } | null;
+  accountPortal: { registrationUrl: string | null; passwordResetUrl: string | null; profileUrl: string | null } | null;
+  profilePictureBaseUrl: string | null;
+}
+
+export class ConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConfigError';
+  }
+}
+
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function objectAt(value: unknown, path: string): UnknownRecord {
+  if (!isRecord(value)) {
+    throw new ConfigError(`${path} must be an object`);
+  }
+  return value;
+}
+
+function stringAt(value: unknown, path: string, minLength = 1): string {
+  if (typeof value !== 'string' || value.trim().length < minLength) {
+    throw new ConfigError(`${path} is required`);
+  }
+  return value;
+}
+
+function urlAt(value: unknown, path: string, protocols: string[]): string {
+  const raw = stringAt(value, path);
+  let url: URL;
+
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new ConfigError(`${path} must be a valid URL`);
+  }
+
+  if (!protocols.includes(url.protocol) || url.username || url.password) {
+    throw new ConfigError(`${path} must use an allowed URL scheme (${protocols.join(', ')}) without embedded credentials`);
+  }
+
+  return raw;
+}
+
+function databaseUrlAt(value: unknown, path: string): string {
+  const raw = stringAt(value, path);
+  let url: URL;
+
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new ConfigError(`${path} must be a valid PostgreSQL URL`);
+  }
+
+  if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname || !url.pathname || !url.username || !url.password) {
+    throw new ConfigError(`${path} must include a PostgreSQL host, database, and credentials`);
+  }
+
+  return raw;
+}
+
+function legacyKeyAt(value: unknown, path: string): string {
+  const key = stringAt(value, path, 12);
+  if (new Set(key).size < 8 || /^(replace|change|example|your|set)[-_]/i.test(key)) {
+    throw new ConfigError(`${path} must be the key supplied by the existing account system`);
+  }
+  return key;
+}
+
+function secretAt(value: unknown, path: string): string {
+  const secret = stringAt(value, path, 43);
+  const alphabet = /^[A-Za-z0-9_-]+$/.test(secret);
+  const diversity = new Set(secret).size;
+
+  if (!alphabet || diversity < 16 || /^(replace|change|example|your)[-_]/i.test(secret)) {
+    throw new ConfigError(`${path} must be a strong base64url secret`);
+  }
+  return secret;
+}
+
+function trustedProxyCidrsAt(value: unknown): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 32) {
+    throw new ConfigError('trustedProxyCidrs must be an array with at most 32 entries');
+  }
+  return value.map((entry, index) => {
+    if (typeof entry !== 'string' || entry.length === 0 || entry.trim() !== entry || /\s/.test(entry)) {
+      throw new ConfigError(`trustedProxyCidrs[${index}] must be an IP address or CIDR`);
+    }
+    const parts = entry.split('/');
+    if (parts.length > 2) throw new ConfigError(`trustedProxyCidrs[${index}] must be an IP address or CIDR`);
+    const version = isIP(parts[0] ?? '');
+    if (!version) throw new ConfigError(`trustedProxyCidrs[${index}] must be an IP address or CIDR`);
+    if (parts.length === 2) {
+      const prefixText = parts[1] ?? '';
+      if (!/^(0|[1-9][0-9]*)$/.test(prefixText)) {
+        throw new ConfigError(`trustedProxyCidrs[${index}] has an invalid prefix`);
+      }
+      const prefix = Number(prefixText);
+      if (!Number.isInteger(prefix) || prefix < 0 || prefix > (version === 4 ? 32 : 128)) {
+        throw new ConfigError(`trustedProxyCidrs[${index}] has an invalid prefix`);
+      }
+    }
+    return entry;
+  });
+}
+
+function profilePictureBaseUrlAt(value: unknown, mode: RuntimeMode): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  const url = urlAt(value, 'profilePictureBaseUrl', ['https:', ...(mode === 'production' ? [] : ['http:'])]);
+  const parsed = new URL(url);
+  if (parsed.search || parsed.hash) throw new ConfigError('profilePictureBaseUrl must not contain query or fragment');
+  return url.endsWith('/') ? url : url + '/';
+}
+
+function accountPortalAt(value: unknown, mode: RuntimeMode): ServiceConfig['accountPortal'] {
+  if (value === undefined || value === null) return null;
+  const input = objectAt(value, 'accountPortal');
+  const url = (key: string): string | null => {
+    if (input[key] === undefined || input[key] === null || input[key] === '') return null;
+    const result = urlAt(input[key], 'accountPortal.' + key, ['https:', ...(mode === 'production' ? [] : ['http:'])]);
+    if (new URL(result).hash) throw new ConfigError('accountPortal.' + key + ' must not contain a fragment');
+    return result;
+  };
+  return {
+    registrationUrl: url('registrationUrl'),
+    passwordResetUrl: url('passwordResetUrl'),
+    profileUrl: url('profileUrl'),
+  };
+}
+
+function smtpConfigAt(value: unknown): ServiceConfig['smtp'] {
+  if (value === undefined || value === null) return null;
+  const input = objectAt(value, 'smtp');
+  const host = stringAt(input.host, 'smtp.host');
+  if (host.length > 253 || !/^[A-Za-z0-9.-]+$/.test(host) || host.startsWith('.') || host.endsWith('.')) {
+    throw new ConfigError('smtp.host must be a hostname or IP address');
+  }
+  if (!Number.isInteger(input.port) || Number(input.port) < 1 || Number(input.port) > 65535) {
+    throw new ConfigError('smtp.port must be an integer between 1 and 65535');
+  }
+  if (typeof input.secure !== 'boolean') throw new ConfigError('smtp.secure must be a boolean');
+  const user = input.user === undefined || input.user === null || input.user === '' ? null : stringAt(input.user, 'smtp.user');
+  const password = input.password === undefined || input.password === null || input.password === '' ? null : stringAt(input.password, 'smtp.password');
+  if ((user === null) !== (password === null)) throw new ConfigError('smtp.user and smtp.password must be configured together');
+  const from = stringAt(input.from, 'smtp.from');
+  if (from.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from)) throw new ConfigError('smtp.from must be an email address');
+  return { host, port: Number(input.port), secure: input.secure, user, password, from };
+}
+
+function rateLimitConfigAt(value: unknown): ServiceConfig['loginRateLimit'] {
+  const input = value === undefined ? {} : objectAt(value, 'loginRateLimit');
+  const integer = (key: string, fallback: number, minimum: number, maximum: number): number => {
+    const candidate = input[key] === undefined ? fallback : input[key];
+    if (!Number.isSafeInteger(candidate) || Number(candidate) < minimum || Number(candidate) > maximum) {
+      throw new ConfigError(`loginRateLimit.${key} must be an integer between ${minimum} and ${maximum}`);
+    }
+    return Number(candidate);
+  };
+  return {
+    windowSeconds: integer('windowSeconds', 900, 60, 86400),
+    accountAttempts: integer('accountAttempts', 10, 1, 1000),
+    ipAttempts: integer('ipAttempts', 100, 1, 10000),
+  };
+}
+
+export function loadConfig(input: unknown): ServiceConfig {
+  const root = objectAt(input, 'config');
+  const modeValue = stringAt(root.mode, 'mode');
+  if (!['development', 'test', 'production'].includes(modeValue)) {
+    throw new ConfigError('mode must be development, test, or production');
+  }
+  const mode = modeValue as RuntimeMode;
+
+  const issuer = urlAt(root.issuer, 'issuer', ['https:', ...(mode === 'production' ? [] : ['http:'])]);
+  const issuerUrl = new URL(issuer);
+  if (issuerUrl.search || issuerUrl.hash || issuerUrl.username || issuerUrl.password) {
+    throw new ConfigError('issuer must not contain query, fragment, or credentials');
+  }
+
+  if (!Number.isInteger(root.port) || Number(root.port) < 1 || Number(root.port) > 65535) {
+    throw new ConfigError('port must be an integer between 1 and 65535');
+  }
+
+  const secretsInput = objectAt(root.secrets, 'secrets');
+  if (root.admin !== undefined) {
+    throw new ConfigError('admin credentials must be stored in the database');
+  }
+  const databases = objectAt(root.databases, 'databases');
+  const secrets = {
+    legacyHmacKey: legacyKeyAt(secretsInput.legacyHmacKey, 'secrets.legacyHmacKey'),
+    cookie: secretAt(secretsInput.cookie, 'secrets.cookie'),
+    fingerprint: secretAt(secretsInput.fingerprint, 'secrets.fingerprint'),
+    subject: secretAt(secretsInput.subject, 'secrets.subject'),
+    encryption: secretAt(secretsInput.encryption, 'secrets.encryption'),
+  };
+
+  if (new Set(Object.values(secrets)).size !== Object.keys(secrets).length) {
+    throw new ConfigError('secrets must be independent');
+  }
+
+  return {
+    mode,
+    issuer: issuer.replace(/\/$/, ''),
+    port: Number(root.port),
+    secrets,
+    databases: {
+      oidc: databaseUrlAt(databases.oidc, 'databases.oidc'),
+      accounts: databaseUrlAt(databases.accounts, 'databases.accounts'),
+    },
+    redisUrl: urlAt(root.redisUrl, 'redisUrl', ['redis:', 'rediss:']),
+    redisUsername: root.redisUsername === undefined || root.redisUsername === null || root.redisUsername === ''
+      ? null
+      : stringAt(root.redisUsername, 'redisUsername'),
+    redisPassword: root.redisPassword === undefined || root.redisPassword === null || root.redisPassword === ''
+      ? null
+      : stringAt(root.redisPassword, 'redisPassword'),
+    trustedProxyCidrs: trustedProxyCidrsAt(root.trustedProxyCidrs),
+    loginRateLimit: rateLimitConfigAt(root.loginRateLimit),
+    smtp: smtpConfigAt(root.smtp),
+    accountPortal: accountPortalAt(root.accountPortal, mode),
+    profilePictureBaseUrl: profilePictureBaseUrlAt(root.profilePictureBaseUrl, mode),
+  };
+}

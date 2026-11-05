@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+.nyc_output/
+.env
+.env.*
+!.env.example
+*.log
+*.pid
+secrets/
+*.pem
+*.key
+.DS_Store
+/runtime/
+!/runtime/
+/runtime/*
+!/runtime/config.example.json

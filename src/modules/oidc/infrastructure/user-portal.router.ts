@@ -1,0 +1,334 @@
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+
+import express, { type Request, type Response, Router } from 'express';
+import type Provider from 'oidc-provider';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
+import type { Pool } from 'pg';
+
+import type { AccountService } from '../../account/application/account-identity.service.js';
+import { safeProfilePictureUrl } from '../../account/domain/accounts.js';
+import type { ServiceConfig } from '../../../infrastructure/config/config.schema.js';
+import { escapeHtml } from '../../../common/security/security.js';
+import { PORTAL_CLIENT_ID } from './provider.factory.js';
+
+interface PortalState {
+  verifier: string;
+  nonce: string;
+  returnTo: string;
+}
+
+interface PortalRedis {
+  set(key: string, value: string, options: { EX: number; NX: true }): Promise<string | null>;
+  eval(script: string, options: { keys: string[]; arguments: string[] }): Promise<unknown>;
+}
+
+const TAKE_PORTAL_STATE = "local value = redis.call('GET', KEYS[1]); if value then redis.call('DEL', KEYS[1]); end; return value";
+const PORTAL_STATE_TTL_SECONDS = 900;
+const PORTAL_JWKS = new WeakMap<Provider, ReturnType<typeof createRemoteJWKSet>>();
+
+function loginStateKey(state: string, secret: string): string {
+  return 'dt:portal:login:' + createHmac('sha256', secret).update(state, 'utf8').digest('hex');
+}
+
+function safeReturnPath(value: unknown): string {
+  if (typeof value !== 'string') return '/developer/overview';
+  if (value === '/portal/authorizations' || value === '/portal/profile') return value;
+  if (/^\/(?:developer|account)(?:\/[A-Za-z0-9._~-]+)*$/.test(value)) return value;
+  return '/developer/overview';
+}
+
+function portalJwks(provider: Provider, issuer: string): ReturnType<typeof createRemoteJWKSet> {
+  const existing = PORTAL_JWKS.get(provider);
+  if (existing) return existing;
+  const created = createRemoteJWKSet(new URL(issuer + '/jwks'));
+  PORTAL_JWKS.set(provider, created);
+  return created;
+}
+
+function scalar(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+function cookieValue(request: Request, name: string): string | null {
+  for (const entry of (request.headers.cookie ?? '').split(';')) {
+    const index = entry.indexOf('=');
+    if (index < 0 || entry.slice(0, index).trim() !== name) continue;
+    try {
+      return decodeURIComponent(entry.slice(index + 1).trim());
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function html(title: string, content: string): string {
+  return '<!doctype html><html lang="zh-CN"><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>' + escapeHtml(title) + ' · MOONDROP</title><link rel="icon" href="/assets/moondrop.ico">' +
+    '<style>body{font:16px system-ui,sans-serif;max-width:48rem;margin:7vh auto;padding:0 1rem;color:#172033}' +
+    'main{border:1px solid #dce3ec;border-radius:12px;padding:1.5rem}button{padding:.55rem 1rem;cursor:pointer}' +
+    'li{padding:.6rem 0;border-bottom:1px solid #e6ebf1}</style><main><h1>' +
+    escapeHtml(title) + '</h1>' + content + '</main></html>';
+}
+
+function error(response: Response, status: number, message: string): void {
+  response.status(status).type('html').send(html('无法继续', '<p>' + escapeHtml(message) + '</p>'));
+}
+
+export function createUserPortalRouter(
+  pool: Pool,
+  provider: Provider,
+  accounts: AccountService,
+  config: ServiceConfig,
+  redis: PortalRedis,
+): Router {
+  const router = Router();
+  router.use(express.urlencoded({ extended: false, limit: '8kb', parameterLimit: 10 }));
+  const secure = config.issuer.startsWith('https:');
+  const csrfName = secure ? '__Host-dt-user-csrf' : 'dt-user-csrf';
+
+  const currentSession = async (request: Request, response: Response): Promise<{ accountId: string; uuid: string; identity: Awaited<ReturnType<AccountService['resolve']>> } | null> => {
+    try {
+      const context = provider.createContext(request, response);
+      const session = await provider.Session.get(context);
+      const accountId = session.accountId;
+      if (typeof accountId !== 'string') return null;
+      const separator = accountId.lastIndexOf('.');
+      if (separator < 1) return null;
+      const uuid = accountId.slice(0, separator);
+      const fingerprint = accountId.slice(separator + 1);
+      if (!/^[A-Za-z0-9_-]{43}$/.test(fingerprint)) return null;
+      const identity = await accounts.resolve(uuid, fingerprint, 'user-portal');
+      return identity ? { accountId, uuid: identity.uuid, identity } : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const csrfToken = (response: Response): string => {
+    const token = randomBytes(32).toString('base64url');
+    response.cookie(csrfName, token, {
+      httpOnly: true,
+      sameSite: 'strict',
+      secure,
+      path: '/',
+      maxAge: 15 * 60 * 1000,
+    });
+    return token;
+  };
+
+  const validatePost = (request: Request): boolean => {
+    if (request.header('origin') !== new URL(config.issuer).origin) return false;
+    const cookie = cookieValue(request, csrfName);
+    const submitted = scalar(request.body?.csrf);
+    if (!cookie || !submitted) return false;
+    const left = Buffer.from(cookie);
+    const right = Buffer.from(submitted);
+    return left.length === right.length && timingSafeEqual(left, right);
+  };
+
+  router.get('/sign-in', async (request, response) => {
+    const returnTo = safeReturnPath(request.query.return);
+    if (await currentSession(request, response)) return response.redirect(303, returnTo);
+    const state = randomBytes(32).toString('base64url');
+    const loginState: PortalState = {
+      verifier: randomBytes(32).toString('base64url'),
+      nonce: randomBytes(32).toString('base64url'),
+      returnTo,
+    };
+    try {
+      const stored = await redis.set(
+        loginStateKey(state, config.secrets.cookie),
+        JSON.stringify(loginState),
+        { EX: PORTAL_STATE_TTL_SECONDS, NX: true },
+      );
+      if (stored !== 'OK') throw new Error('Portal login state could not be stored');
+      const challenge = createHash('sha256').update(loginState.verifier, 'utf8').digest('base64url');
+      const authorization = new URL(config.issuer + '/auth');
+      authorization.searchParams.set('client_id', PORTAL_CLIENT_ID);
+      authorization.searchParams.set('redirect_uri', config.issuer + '/portal/callback');
+      authorization.searchParams.set('response_type', 'code');
+      authorization.searchParams.set('scope', 'openid profile email');
+      authorization.searchParams.set('state', state);
+      authorization.searchParams.set('nonce', loginState.nonce);
+      authorization.searchParams.set('code_challenge', challenge);
+      authorization.searchParams.set('code_challenge_method', 'S256');
+      response.redirect(303, authorization.toString());
+    } catch {
+      error(response, 503, '登录服务暂时不可用，请稍后重试 / Sign-in service is temporarily unavailable. Try again later.');
+    }
+  });
+
+  router.get('/callback', async (request, response) => {
+    const state = scalar(request.query.state);
+    const code = scalar(request.query.code);
+    if (!state || !/^[A-Za-z0-9_-]{43}$/.test(state) || !code || code.length > 4096) {
+      return error(response, 400, '登录事务无效，请重新开始 / Invalid sign-in transaction. Start again.');
+    }
+
+    try {
+      const stored = await redis.eval(TAKE_PORTAL_STATE, {
+        keys: [loginStateKey(state, config.secrets.cookie)],
+        arguments: [],
+      });
+      if (typeof stored !== 'string') return error(response, 400, '登录事务已失效，请重新开始 / Sign-in transaction expired. Start again.');
+      const parsed = JSON.parse(stored) as unknown;
+      if (
+        typeof parsed !== 'object' || parsed === null || Array.isArray(parsed) ||
+        typeof (parsed as PortalState).verifier !== 'string' ||
+        typeof (parsed as PortalState).nonce !== 'string' ||
+        typeof (parsed as PortalState).returnTo !== 'string'
+      ) return error(response, 400, '登录事务无效，请重新开始 / Invalid sign-in transaction. Start again.');
+      const loginState = parsed as PortalState;
+      const tokenRequest = new AbortController();
+      const tokenRequestTimeout = setTimeout(() => tokenRequest.abort(), 5000);
+      const tokenResponse = await (async () => {
+        try {
+          return await fetch(config.issuer + '/token', {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              grant_type: 'authorization_code',
+              code,
+              redirect_uri: config.issuer + '/portal/callback',
+              client_id: PORTAL_CLIENT_ID,
+              code_verifier: loginState.verifier,
+            }),
+            signal: tokenRequest.signal,
+          });
+        } finally {
+          clearTimeout(tokenRequestTimeout);
+        }
+      })();
+      if (!tokenResponse.ok) return error(response, 400, '登录验证失败，请重新开始 / Sign-in verification failed. Start again.');
+      const tokens = await tokenResponse.json() as Record<string, unknown>;
+      if (typeof tokens.id_token !== 'string') return error(response, 400, '登录验证失败，请重新开始 / Sign-in verification failed. Start again.');
+      const verified = await jwtVerify(tokens.id_token, portalJwks(provider, config.issuer), {
+        issuer: config.issuer,
+        audience: PORTAL_CLIENT_ID,
+      });
+      const session = await currentSession(request, response);
+      if (!session) return error(response, 401, '登录状态已失效，请重新开始 / Sign-in session expired. Start again.');
+      const fingerprint = session.accountId.slice(session.accountId.lastIndexOf('.') + 1);
+      const identity = await accounts.resolve(session.uuid, fingerprint, PORTAL_CLIENT_ID);
+      if (!identity || verified.payload.sub !== identity.sub || scalar(verified.payload.nonce) !== loginState.nonce) {
+        return error(response, 401, '身份验证未通过，请重新开始 / Identity verification failed. Start again.');
+      }
+      response.redirect(303, safeReturnPath(loginState.returnTo));
+    } catch {
+      error(response, 503, '登录验证暂时不可用，请稍后重试 / Sign-in verification is temporarily unavailable. Try again later.');
+    }
+  });
+
+  router.get('/', (_request, response) => response.redirect(303, '/portal/authorizations'));
+
+  router.get('/profile', async (request, response) => {
+    const session = await currentSession(request, response);
+    if (!session) return response.redirect(303, '/portal/sign-in?return=%2Fportal%2Fprofile');
+    const nickname = session.identity?.profile.nickname ?? '未设置 / Not set';
+    const email = session.identity?.profile.email;
+    const maskedEmail = email
+      ? (email.includes('@') ? email.slice(0, 1) + '***' + email.slice(email.indexOf('@')) : '***')
+      : '未提供 / Not provided';
+    const picture = safeProfilePictureUrl(session.identity?.profile.picture ?? null, config.profilePictureBaseUrl);
+    const pictureMarkup = picture ? '<img src="' + escapeHtml(picture) + '" alt="头像 / Profile picture" width="96" height="96">' : '';
+    const accountLink = config.accountPortal?.profileUrl
+      ? '<p><a href="' + escapeHtml(config.accountPortal.profileUrl) + '" target="_blank" rel="noopener noreferrer">管理资料 / Manage profile</a></p>'
+      : '<p>资料由账号服务维护 / Profile is managed by the account service.</p>';
+    const navigation = '<nav><a href="/portal/profile">个人资料 / Profile</a> · <a href="/portal/authorizations">应用授权 / Authorizations</a></nav>';
+    const content = navigation + pictureMarkup + '<dl><dt>昵称 / Nickname</dt><dd>' + escapeHtml(nickname) +
+      '</dd><dt>邮箱 / Email</dt><dd>' + escapeHtml(maskedEmail) + '</dd></dl>' + accountLink;
+    response.type('html').send(html('个人资料 / Profile', content));
+  });
+
+  router.get('/authorizations', async (request, response) => {
+    const session = await currentSession(request, response);
+    if (!session) return response.redirect(303, '/portal/sign-in?return=%2Fportal%2Fauthorizations');
+    try {
+      const result = await pool.query<{
+        document_id: string;
+        client_id: string | null;
+        scope: string | null;
+        created_at: Date;
+        name: string | null;
+        status: string | null;
+      }>(
+        "SELECT d.document_id, d.client_id, coalesce(d.payload->>'scope', d.payload->'openid'->>'scope') AS scope, d.created_at, coalesce(a.approved_config->>'name', a.draft_config->>'name') AS name, a.status FROM oidc_document d LEFT JOIN oidc_application a ON a.client_id = d.client_id AND a.status = 'approved' WHERE d.model = 'Grant' AND d.payload->>'accountId' = $1 AND (d.expires_at IS NULL OR d.expires_at > now()) ORDER BY d.created_at DESC, d.document_id LIMIT 100",
+        [session.accountId],
+      );
+      const navigation = '<nav><a href="/portal/profile">个人资料 / Profile</a> · <a href="/portal/authorizations">应用授权 / Authorizations</a></nav>';
+      const list = result.rows.map((row) => {
+        const name = row.name ?? row.client_id ?? '未知应用';
+        const status = row.status === 'approved' ? '可用 / Active' : row.status ? '不可用 / Unavailable' : '平台门户 / Platform portal';
+        return '<li><strong>' + escapeHtml(name) + '</strong><p>权限 / Permissions: ' +
+          escapeHtml(row.scope ?? 'openid') + '</p><p>状态 / Status: ' + escapeHtml(status) +
+          ' · 授权时间 / Authorized: ' + escapeHtml(new Date(row.created_at).toISOString()) +
+          '</p><a href="/portal/authorizations/' + encodeURIComponent(row.document_id) + '/confirm-revoke">撤销授权 / Revoke</a></li>';
+      }).join('');
+      const content = result.rows.length ? '<ul>' + list + '</ul>' : '<p>当前没有应用授权 / No applications are authorized.</p>';
+      response.type('html').send(html('已授权的应用 / Authorizations', navigation + content));
+    } catch {
+      error(response, 503, '授权记录暂时不可用 / Authorization data is temporarily unavailable.');
+    }
+  });
+
+  router.get('/authorizations/:id/confirm-revoke', async (request, response) => {
+    const session = await currentSession(request, response);
+    if (!session) return response.redirect(303, '/portal/sign-in?return=%2Fportal%2Fauthorizations');
+    const grantId = request.params.id;
+    if (!grantId || grantId.length > 128) return error(response, 404, '授权记录不存在 / Authorization not found.');
+    try {
+      const result = await pool.query<{ scope: string | null; created_at: Date; name: string | null }>(
+        "SELECT coalesce(d.payload->>'scope', d.payload->'openid'->>'scope') AS scope, d.created_at, " +
+        "coalesce(a.approved_config->>'name', a.draft_config->>'name', d.client_id) AS name " +
+        "FROM oidc_document d LEFT JOIN oidc_application a ON a.client_id = d.client_id " +
+        "WHERE d.model = 'Grant' AND d.document_id = $1 AND d.payload->>'accountId' = $2 " +
+        "AND (d.expires_at IS NULL OR d.expires_at > now()) LIMIT 1",
+        [grantId, session.accountId],
+      );
+      const row = result.rows[0];
+      if (!row) return error(response, 404, '授权记录不存在 / Authorization not found.');
+      const csrf = csrfToken(response);
+      const content = '<p><strong>' + escapeHtml(row.name ?? '应用 / Application') +
+        '</strong> 将无法继续使用此平台授权。此操作不会删除该应用中的本地账号或会话。 / The application will lose access to this grant. Its local account and session are not deleted.</p>' +
+        '<p>权限 / Permissions: ' + escapeHtml(row.scope ?? 'openid') + '</p>' +
+        '<form method="post" action="/portal/authorizations/' + encodeURIComponent(grantId) + '/revoke">' +
+        '<input type="hidden" name="csrf" value="' + escapeHtml(csrf) + '">' +
+        '<button type="submit">确认撤销 / Confirm revocation</button></form>' +
+        '<p><a href="/portal/authorizations">返回 / Back</a></p>';
+      response.type('html').send(html('确认撤销授权 / Confirm authorization revocation', content));
+    } catch {
+      error(response, 503, '授权记录暂时不可用 / Authorization data is unavailable.');
+    }
+  });
+
+  router.post('/authorizations/:id/revoke', async (request, response) => {
+    if (!validatePost(request)) return error(response, 403, '请求校验失败，请重新打开授权页面 / Request validation failed. Reopen the authorization page.');
+    const session = await currentSession(request, response);
+    if (!session) return error(response, 401, '登录状态已失效 / The sign-in session has expired.');
+    const grantId = request.params.id;
+    if (!grantId || grantId.length > 128) return error(response, 404, '授权记录不存在 / Authorization not found.');
+
+    try {
+      const row = await pool.query<{ document_id: string }>(
+        "SELECT document_id FROM oidc_document WHERE model = 'Grant' AND document_id = $1 AND payload->>'accountId' = $2 LIMIT 1",
+        [grantId, session.accountId],
+      );
+      if (row.rowCount !== 1) return error(response, 404, '授权记录不存在 / Authorization not found.');
+      const grant = await provider.Grant.find(grantId);
+      if (!grant || grant.accountId !== session.accountId) return error(response, 404, '授权记录不存在 / Authorization not found.');
+      await grant.adapter.revokeByGrantId(grantId);
+      await grant.destroy();
+      await pool.query(
+        "INSERT INTO platform_audit (actor_type, actor_id, action, application_id, outcome, details) SELECT 'account', $1, 'authorization.revoke', id, 'success', '{}'::jsonb FROM oidc_application WHERE client_id = $2",
+        [session.uuid, grant.clientId ?? null],
+      );
+      response.redirect(303, '/portal/authorizations');
+    } catch {
+      error(response, 503, '撤销授权失败，请稍后重试 / Revocation failed. Try again later.');
+    }
+  });
+
+  return router;
+}

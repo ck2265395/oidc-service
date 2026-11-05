@@ -1,0 +1,8 @@
+{
+  "name": "dt-identity-web-client-example",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "jose": "6.2.13" }
+}

@@ -1,0 +1,2 @@
+export const PROVIDER_SESSIONS = Symbol('PROVIDER_SESSION_PORT');
+export const ADMIN_SESSION_AUTH = Symbol('ADMIN_SESSION_AUTH');

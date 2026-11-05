@@ -1,0 +1,70 @@
+import type { AddressInfo } from 'node:net';
+
+import { type INestApplication, Logger, type LoggerService } from '@nestjs/common';
+import type { Express } from 'express';
+import express from 'express';
+import { NestFactory } from '@nestjs/core';
+import { ExpressAdapter } from '@nestjs/platform-express';
+
+import { AppModule } from '../app.module.js';
+import { ApplicationExceptionFilter } from '../common/filters/application-exception.filter.js';
+import { configureHttpFoundation } from '../common/middleware/request-context.middleware.js';
+import { ConfigService } from '../infrastructure/config/config.service.js';
+import { OidcProviderService } from '../modules/oidc/oidc-provider.service.js';
+
+export interface BootstrapOptions {
+  configPath?: string;
+  port?: number;
+  host?: string;
+  logger?: false | LoggerService | Array<'log' | 'error' | 'warn' | 'debug' | 'verbose' | 'fatal'>;
+  infrastructure?: boolean;
+}
+
+export interface NestApplicationHandle {
+  app: INestApplication;
+  port: number;
+  close(): Promise<void>;
+}
+
+export async function bootstrapNest(options: BootstrapOptions = {}): Promise<NestApplicationHandle> {
+  const config = await ConfigService.fromFile(options.configPath);
+  let app: INestApplication | undefined;
+  try {
+    app = await NestFactory.create(
+      AppModule.register(config, options.infrastructure),
+      new ExpressAdapter(),
+      { abortOnError: false, bodyParser: false, bufferLogs: true, logger: options.logger ?? ['log', 'error', 'warn'] },
+    );
+    const requestLogger = options.logger && !Array.isArray(options.logger)
+      ? options.logger
+      : options.logger === false ? { log: () => undefined } : new Logger('HTTP');
+    const server = app.getHttpAdapter().getInstance() as Express;
+    server.disable('x-powered-by');
+    configureHttpFoundation(server, config.get(), requestLogger);
+    server.use('/api', express.json({ limit: '32kb' }));
+    server.use('/api', express.urlencoded({ extended: false, limit: '16kb', parameterLimit: 20 }));
+    if (options.infrastructure) {
+      const oidc = app.get(OidcProviderService);
+      await oidc.initialize();
+      oidc.mountProtocol(server);
+    }
+    app.useGlobalFilters(new ApplicationExceptionFilter());
+    app.enableShutdownHooks();
+    await app.listen(options.port ?? config.get().port, options.host ?? '0.0.0.0');
+  } catch (cause) {
+    if (app) await app.close().catch(() => undefined);
+    throw cause;
+  }
+  const address = app.getHttpServer().address() as AddressInfo | null;
+  if (!address) { await app.close(); throw new Error('Nest application did not bind a TCP port'); }
+  let closed = false;
+  return {
+    app,
+    port: address.port,
+    close: async () => {
+      if (closed) return;
+      closed = true;
+      await app.close();
+    },
+  };
+}

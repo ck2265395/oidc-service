@@ -1,0 +1,67 @@
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, expect, test, vi } from 'vitest';
+
+import { ConsoleApp } from './ConsoleApp';
+
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+test('public portal exposes only developer actions', () => {
+  window.history.replaceState({}, '', '/');
+  render(<ConsoleApp />);
+
+  expect(screen.getByRole('heading', { name: '连接用户与应用，从一个可信身份开始' })).toBeInTheDocument();
+  expect(screen.getAllByRole('link', { name: '注册开发者' })[0]).toHaveAttribute('href', '/developer/register');
+  expect(screen.getByRole('link', { name: '登录控制台' })).toHaveAttribute('href', '/developer/login');
+  expect(screen.getAllByRole('link', { name: /接入文档/ })[0]).toHaveAttribute('href', '/developer/docs');
+  expect(screen.queryByRole('link', { name: '账号中心' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: '运营管理后台' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('navigation', { name: '开发者控制台' })).not.toBeInTheDocument();
+});
+
+test('developer landing alias returns to the public portal', () => {
+  window.history.replaceState({}, '', '/developer');
+  render(<ConsoleApp />);
+
+  expect(screen.getByRole('heading', { name: '连接用户与应用，从一个可信身份开始' })).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/');
+});
+
+test('developer login offers email password and MOONDROP identity', () => {
+  window.history.replaceState({}, '', '/developer/login');
+  render(<ConsoleApp />);
+
+  expect(screen.getByRole('heading', { name: '登录开发者控制台' })).toBeInTheDocument();
+  expect(screen.getByLabelText('邮箱')).toBeInTheDocument();
+  expect(screen.getByLabelText('密码')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: '使用水月雨账号登录' })).toHaveAttribute('href', '/developer/login/moondrop?returnTo=%2Fdeveloper%2Fconsole%2Foverview');
+});
+
+test('developer registration uses email code and password without a phone field', () => {
+  window.history.replaceState({}, '', '/developer/register');
+  render(<ConsoleApp />);
+
+  expect(screen.getByLabelText('邮箱')).toBeInTheDocument();
+  expect(screen.getByLabelText('邮箱验证码')).toBeInTheDocument();
+  expect(screen.getByLabelText('设置密码')).toBeInTheDocument();
+  expect(screen.queryByLabelText('手机号')).not.toBeInTheDocument();
+});
+
+test('developer documentation remains public while checking header session state', () => {
+  window.history.replaceState({}, '', '/developer/docs');
+  const fetch = vi.fn();
+  vi.stubGlobal('fetch', fetch);
+  render(<ConsoleApp />);
+
+  expect(screen.getByText('QUICK START')).toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledWith('/api/v1/developer-auth/session', expect.anything());
+});
+
+test('MOONDROP first login offers create or verified existing-account binding', async () => {
+  window.history.replaceState({}, '', '/developer/bind');
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ code: 0, desc: 'ok', data: { bound: false, account: null } }), { status: 200, headers: { 'content-type': 'application/json' } })));
+  render(<ConsoleApp />);
+
+  expect(await screen.findByRole('button', { name: '创建新的开发者身份' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '绑定已有开发者账号' })).toBeInTheDocument();
+  expect(screen.getByLabelText('开发者邮箱')).toBeInTheDocument();
+});
