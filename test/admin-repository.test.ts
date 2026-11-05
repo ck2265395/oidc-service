@@ -51,3 +51,22 @@ test('administrator sessions are owned by an active administrator', async () => 
   assert.match(calls[1]?.sql ?? '', /status = 'active'/);
   assert.match(calls[1]?.sql ?? '', /FROM platform_admin/);
 });
+
+test('password reset rolls back password, session revocation, and audit together', async () => {
+  const calls: string[] = [];
+  const client = {
+    async query(sql: string) {
+      calls.push(sql);
+      if (sql.startsWith('INSERT INTO platform_audit')) throw new Error('audit unavailable');
+      return { rows: [], rowCount: 1 };
+    },
+    release() { calls.push('RELEASE'); },
+  };
+  const repository = new PostgresAdminRepository({ async query() { throw new Error('pool query must not be used'); }, async connect() { return client; } } as never);
+  await assert.rejects(() => repository.resetPassword('actor-id', 'target-id', 'next-hash'), /audit unavailable/);
+  assert.ok(calls.some((sql) => sql.startsWith('UPDATE platform_admin')));
+  assert.ok(calls.some((sql) => sql.startsWith('DELETE FROM admin_session')));
+  assert.ok(calls.some((sql) => sql.startsWith('INSERT INTO platform_audit')));
+  assert.ok(calls.includes('ROLLBACK'));
+  assert.ok(!calls.includes('COMMIT'));
+});

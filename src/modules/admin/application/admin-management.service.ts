@@ -6,13 +6,12 @@ import { hashAdminPassword } from './admin-authentication.service.js';
 
 interface AdminManagementRepository {
   listAdministrators(page: number, pageSize: number): Promise<{ total: number; list: AdministratorRecord[] }>;
-  createAdministrator(id: string, username: string, passwordHash: string, role: AdminRole, mustChangePassword: boolean): Promise<AdministratorRecord>;
-  setStatus(targetId: string, status: AdminStatus): Promise<AdministratorRecord | null>;
-  setRole(targetId: string, role: AdminRole): Promise<AdministratorRecord | null>;
-  resetPassword(targetId: string, passwordHash: string): Promise<boolean>;
+  createManagedAdministrator(actorId: string, id: string, username: string, passwordHash: string, role: AdminRole): Promise<AdministratorRecord>;
+  setStatus(actorId: string, targetId: string, status: AdminStatus): Promise<AdministratorRecord | null>;
+  setRole(actorId: string, targetId: string, role: AdminRole): Promise<AdministratorRecord | null>;
+  resetPassword(actorId: string, targetId: string, passwordHash: string): Promise<boolean>;
   findCredential(username: string): Promise<AdminCredential | null>;
   changeOwnPassword(targetId: string, passwordHash: string): Promise<void>;
-  recordManagementAudit?(actorId: string, action: string, targetId: string, details?: Record<string, unknown>): Promise<void>;
 }
 
 export class AdminManagementError extends Error {
@@ -36,8 +35,7 @@ export class AdminManagementService {
     if (!displayName || displayName.length > 128 || !['super_admin', 'operator', 'auditor'].includes(role)) throw new AdminManagementError('invalid_input');
     const password = this.createTemporaryPassword();
     try {
-      const administrator = await this.repository.createAdministrator(this.createId(), displayName, hashAdminPassword(password), role, true);
-      await this.repository.recordManagementAudit?.(actor.id, 'administrator.create', administrator.id, { role });
+      const administrator = await this.repository.createManagedAdministrator(actor.id, this.createId(), displayName, hashAdminPassword(password), role);
       return { administrator, temporaryPassword: password };
     } catch (cause) {
       if (cause && typeof cause === 'object' && 'code' in cause && cause.code === '23505') throw new AdminManagementError('conflict');
@@ -49,9 +47,8 @@ export class AdminManagementService {
     assertSuperAdmin(actor);
     if (actor.id === targetId) throw new AdminManagementError('self_protected');
     if (!['active', 'disabled'].includes(status)) throw new AdminManagementError('invalid_input');
-    const result = await this.repository.setStatus(targetId, status);
+    const result = await this.repository.setStatus(actor.id, targetId, status);
     if (!result) throw new AdminManagementError('last_super_admin');
-    await this.repository.recordManagementAudit?.(actor.id, 'administrator.status', targetId, { status });
     return result;
   }
 
@@ -59,17 +56,15 @@ export class AdminManagementService {
     assertSuperAdmin(actor);
     if (actor.id === targetId) throw new AdminManagementError('self_protected');
     if (!['super_admin', 'operator', 'auditor'].includes(role)) throw new AdminManagementError('invalid_input');
-    const result = await this.repository.setRole(targetId, role);
+    const result = await this.repository.setRole(actor.id, targetId, role);
     if (!result) throw new AdminManagementError('last_super_admin');
-    await this.repository.recordManagementAudit?.(actor.id, 'administrator.role', targetId, { role });
     return result;
   }
 
   async resetPassword(actor: AdminPrincipal, targetId: string): Promise<{ temporaryPassword: string }> {
     assertSuperAdmin(actor);
     const password = this.createTemporaryPassword();
-    if (!await this.repository.resetPassword(targetId, hashAdminPassword(password))) throw new AdminManagementError('not_found');
-    await this.repository.recordManagementAudit?.(actor.id, 'administrator.password.reset', targetId);
+    if (!await this.repository.resetPassword(actor.id, targetId, hashAdminPassword(password))) throw new AdminManagementError('not_found');
     return { temporaryPassword: password };
   }
 
@@ -78,6 +73,5 @@ export class AdminManagementService {
     const credential = await this.repository.findCredential(actor.username);
     if (!credential || credential.principal.id !== actor.id || !verifyScryptPassword(currentPassword, credential.passwordHash)) throw new AdminManagementError('invalid_password');
     await this.repository.changeOwnPassword(actor.id, hashAdminPassword(nextPassword));
-    await this.repository.recordManagementAudit?.(actor.id, 'administrator.password.change', actor.id);
   }
 }

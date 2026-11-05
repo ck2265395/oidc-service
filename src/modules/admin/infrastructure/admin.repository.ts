@@ -47,6 +47,20 @@ export class PostgresAdminRepository {
     return result.rows[0] ? administrator(result.rows[0]) : { id, username: displayName, role, status: 'active', mustChangePassword };
   }
 
+  async createManagedAdministrator(actorId: string, id: string, username: string, passwordHash: string, role: AdminRole): Promise<AdministratorRecord> {
+    const displayName = username.trim();
+    return this.transactional(async (client) => {
+      const result = await client.query<Parameters<typeof administrator>[0]>(
+        "INSERT INTO platform_admin (id, username, username_normalized, password_hash, role, status, must_change_password) VALUES ($1, $2, $3, $4, $5, 'active', true) RETURNING id, username, role, status, must_change_password, created_at, updated_at",
+        [id, displayName, displayName.toLowerCase(), passwordHash, role],
+      );
+      const created = result.rows[0];
+      if (!created) throw new Error('Administrator was not created');
+      await this.audit(client, actorId, 'administrator.create', id, { role });
+      return administrator(created);
+    });
+  }
+
   async listAdministrators(page: number, pageSize: number): Promise<{ total: number; list: AdministratorRecord[] }> {
     const [count, rows] = await Promise.all([
       this.pool.query<{ total: string }>('SELECT count(*)::text AS total FROM platform_admin'),
@@ -63,7 +77,11 @@ export class PostgresAdminRepository {
     finally { client.release(); }
   }
 
-  async setStatus(targetId: string, status: AdminStatus): Promise<AdministratorRecord | null> {
+  private async audit(client: PoolClient, actorId: string, action: string, targetId: string, details: Record<string, unknown> = {}): Promise<void> {
+    await client.query("INSERT INTO platform_audit (actor_type, actor_id, action, outcome, details) VALUES ('admin', $1, $2, 'success', $3::jsonb)", [`admin:${actorId}`, action, JSON.stringify({ administratorId: targetId, ...details })]);
+  }
+
+  async setStatus(actorId: string, targetId: string, status: AdminStatus): Promise<AdministratorRecord | null> {
     return this.transactional(async (client) => {
       const current = await client.query<{ role: AdminRole; status: AdminStatus }>('SELECT role, status FROM platform_admin WHERE id = $1 FOR UPDATE', [targetId]);
       const row = current.rows[0];
@@ -74,11 +92,12 @@ export class PostgresAdminRepository {
       }
       const result = await client.query<Parameters<typeof administrator>[0]>('UPDATE platform_admin SET status = $2, updated_at = now() WHERE id = $1 RETURNING id, username, role, status, must_change_password, created_at, updated_at', [targetId, status]);
       if (status === 'disabled') await client.query('DELETE FROM admin_session WHERE admin_id = $1', [targetId]);
+      await this.audit(client, actorId, 'administrator.status', targetId, { status });
       return result.rows[0] ? administrator(result.rows[0]) : null;
     });
   }
 
-  async setRole(targetId: string, role: AdminRole): Promise<AdministratorRecord | null> {
+  async setRole(actorId: string, targetId: string, role: AdminRole): Promise<AdministratorRecord | null> {
     return this.transactional(async (client) => {
       const current = await client.query<{ role: AdminRole; status: AdminStatus }>('SELECT role, status FROM platform_admin WHERE id = $1 FOR UPDATE', [targetId]);
       const row = current.rows[0];
@@ -89,24 +108,27 @@ export class PostgresAdminRepository {
       }
       const result = await client.query<Parameters<typeof administrator>[0]>('UPDATE platform_admin SET role = $2, updated_at = now() WHERE id = $1 RETURNING id, username, role, status, must_change_password, created_at, updated_at', [targetId, role]);
       await client.query('DELETE FROM admin_session WHERE admin_id = $1', [targetId]);
+      await this.audit(client, actorId, 'administrator.role', targetId, { role });
       return result.rows[0] ? administrator(result.rows[0]) : null;
     });
   }
 
-  async resetPassword(targetId: string, passwordHash: string): Promise<boolean> {
-    const result = await this.pool.query('UPDATE platform_admin SET password_hash = $2, must_change_password = true, updated_at = now() WHERE id = $1', [targetId, passwordHash]);
-    if (!result.rowCount) return false;
-    await this.pool.query('DELETE FROM admin_session WHERE admin_id = $1', [targetId]);
-    return true;
+  async resetPassword(actorId: string, targetId: string, passwordHash: string): Promise<boolean> {
+    return this.transactional(async (client) => {
+      const result = await client.query('UPDATE platform_admin SET password_hash = $2, must_change_password = true, updated_at = now() WHERE id = $1', [targetId, passwordHash]);
+      if (!result.rowCount) return false;
+      await client.query('DELETE FROM admin_session WHERE admin_id = $1', [targetId]);
+      await this.audit(client, actorId, 'administrator.password.reset', targetId);
+      return true;
+    });
   }
 
   async changeOwnPassword(targetId: string, passwordHash: string): Promise<void> {
-    await this.pool.query('UPDATE platform_admin SET password_hash = $2, must_change_password = false, updated_at = now() WHERE id = $1', [targetId, passwordHash]);
-    await this.pool.query('DELETE FROM admin_session WHERE admin_id = $1', [targetId]);
-  }
-
-  async recordManagementAudit(actorId: string, action: string, targetId: string, details: Record<string, unknown> = {}): Promise<void> {
-    await this.pool.query("INSERT INTO platform_audit (actor_type, actor_id, action, outcome, details) VALUES ('admin', $1, $2, 'success', $3::jsonb)", [`admin:${actorId}`, action, JSON.stringify({ administratorId: targetId, ...details })]);
+    await this.transactional(async (client) => {
+      await client.query('UPDATE platform_admin SET password_hash = $2, must_change_password = false, updated_at = now() WHERE id = $1', [targetId, passwordHash]);
+      await client.query('DELETE FROM admin_session WHERE admin_id = $1', [targetId]);
+      await this.audit(client, targetId, 'administrator.password.change', targetId);
+    });
   }
 
   async createSession(adminId: string, sessionHash: string): Promise<void> {

@@ -9,15 +9,15 @@ const superAdmin = { id: 'admin-1', username: 'root', role: 'super_admin' as con
 test('super administrator creates an operator with a one-time temporary password', async () => {
   const calls: unknown[][] = [];
   const repository = {
-    async createAdministrator(...values: unknown[]) { calls.push(values); return { id: values[0], username: values[1], role: values[3], status: 'active', mustChangePassword: true }; },
+    async createManagedAdministrator(...values: unknown[]) { calls.push(values); return { id: values[1], username: values[2], role: values[4], status: 'active', mustChangePassword: true }; },
   };
   const service = new AdminManagementService(repository as never, () => 'new-id', () => 'temporary-password-123');
   const result = await service.create(superAdmin, ' Operations ', 'operator');
   assert.equal(result.temporaryPassword, 'temporary-password-123');
   assert.deepEqual(result.administrator, { id: 'new-id', username: 'Operations', role: 'operator', status: 'active', mustChangePassword: true });
-  assert.equal(calls[0]?.[3], 'operator');
-  assert.equal(calls[0]?.[4], true);
-  assert.notEqual(calls[0]?.[2], 'temporary-password-123');
+  assert.equal(calls[0]?.[0], superAdmin.id);
+  assert.equal(calls[0]?.[4], 'operator');
+  assert.notEqual(calls[0]?.[3], 'temporary-password-123');
 });
 
 test('non-super administrators cannot manage administrator accounts', async () => {
@@ -43,8 +43,9 @@ test('password reset returns a generated password once and revokes existing sess
   const service = new AdminManagementService(repository as never, undefined, () => 'reset-password-123');
   const result = await service.resetPassword(superAdmin, 'admin-2');
   assert.equal(result.temporaryPassword, 'reset-password-123');
-  assert.equal(calls[0]?.[0], 'admin-2');
-  assert.notEqual(calls[0]?.[1], 'reset-password-123');
+  assert.equal(calls[0]?.[0], superAdmin.id);
+  assert.equal(calls[0]?.[1], 'admin-2');
+  assert.notEqual(calls[0]?.[2], 'reset-password-123');
 });
 
 test('administrator changes their own password only after current password verification', async () => {
