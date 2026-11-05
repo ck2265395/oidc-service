@@ -32,7 +32,7 @@
     "sbom": "npm sbom --sbom-format=cyclonedx --sbom-type=application --omit=dev > sbom.cdx.json"
   },
   "dependencies": {
-    "@nestjs/common": "12.3.0",
+    "@nestjs/common": "12.3.2",
     "@nestjs/core": "12.3.0",
     "@nestjs/platform-express": "12.3.0",
     "express": "5.3.0",
